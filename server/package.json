@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "seed": "node src/scripts/seedProperties.js"
   },
   "keywords": [],
   "author": "",
@@ -21,7 +22,9 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.8.4",
     "mysql2": "^3.11.5",
+    "node-fetch": "^3.3.2",
     "pg": "^8.13.1",
+    "unsplash-js": "^7.0.19",
     "uuid": "^11.0.3"
   },
   "devDependencies": {

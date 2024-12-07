@@ -20,8 +20,8 @@ pool.on('error', (err) => {
 
 export const query = async (sql, params) => {
   try {
-    const [rows] = await pool.execute(sql, params);
-    return rows;
+    const result = await pool.execute(sql, params);
+    return result;
   } catch (error) {
     console.error('Database query error:', error);
     throw error;
