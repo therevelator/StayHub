@@ -9,7 +9,7 @@ class User {
       const hashedPassword = await bcrypt.hash(password, 10);
       const userId = uuidv4();
       
-      const result = await db.query(
+      const [result] = await db.query(
         `INSERT INTO users (id, email, password_hash, first_name, last_name, phone_number)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [userId, email, hashedPassword, firstName, lastName, phoneNumber]
@@ -27,12 +27,12 @@ class User {
   static async findByEmail(email) {
     try {
       console.log('Finding user by email:', email);
-      const users = await db.query(
+      const [rows] = await db.query(
         'SELECT * FROM users WHERE email = ?',
         [email]
       );
-      console.log('Find by email result:', users[0]);
-      return users[0];
+      console.log('Find by email result:', rows[0]);
+      return rows[0];
     } catch (error) {
       console.error('Error in User.findByEmail:', error);
       throw new Error(`Failed to find user by email: ${error.message}`);
@@ -42,12 +42,12 @@ class User {
   static async findById(id) {
     try {
       console.log('Finding user by id:', id);
-      const users = await db.query(
+      const [rows] = await db.query(
         'SELECT id, email, first_name, last_name, phone_number, created_at, email_verified FROM users WHERE id = ?',
         [id]
       );
-      console.log('Find by id result:', users[0]);
-      return users[0];
+      console.log('Find by id result:', rows[0]);
+      return rows[0];
     } catch (error) {
       console.error('Error in User.findById:', error);
       throw new Error(`Failed to find user by id: ${error.message}`);
@@ -56,6 +56,10 @@ class User {
 
   static async verifyPassword(password, hashedPassword) {
     try {
+      if (!password || !hashedPassword) {
+        console.error('Missing password or hashedPassword');
+        return false;
+      }
       return await bcrypt.compare(password, hashedPassword);
     } catch (error) {
       console.error('Error in User.verifyPassword:', error);
@@ -75,40 +79,31 @@ class User {
     }
   }
 
-  static async createProfile(userId, profileData = {}) {
+  static async createProfile(userId, profileData) {
     try {
-      console.log('Creating profile for user:', userId);
-      const result = await db.query(
-        `INSERT INTO user_profiles (user_id, preferred_language, preferred_currency, notification_preferences)
+      const [result] = await db.query(
+        `INSERT INTO user_profiles (user_id, language, currency, notifications)
          VALUES (?, ?, ?, ?)`,
-        [
-          userId,
-          profileData.language || 'en',
-          profileData.currency || 'USD',
-          JSON.stringify(profileData.notifications || { email: true, push: false })
-        ]
+        [userId, profileData.language, profileData.currency, JSON.stringify(profileData.notifications)]
       );
-      console.log('Profile created successfully');
       return result;
     } catch (error) {
       console.error('Error in User.createProfile:', error);
-      throw new Error(`Failed to create profile: ${error.message}`);
+      throw new Error('Failed to create user profile');
     }
   }
 
   static async createSecuritySettings(userId) {
     try {
-      console.log('Creating security settings for user:', userId);
-      const result = await db.query(
-        `INSERT INTO user_security (user_id)
-         VALUES (?)`,
+      const [result] = await db.query(
+        `INSERT INTO user_security (user_id, two_factor_enabled, last_password_change)
+         VALUES (?, false, CURRENT_TIMESTAMP)`,
         [userId]
       );
-      console.log('Security settings created successfully');
       return result;
     } catch (error) {
       console.error('Error in User.createSecuritySettings:', error);
-      throw new Error(`Failed to create security settings: ${error.message}`);
+      throw new Error('Failed to create security settings');
     }
   }
 }
