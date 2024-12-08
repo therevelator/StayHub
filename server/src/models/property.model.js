@@ -1,4 +1,4 @@
-import db from '../config/database.js';
+import db from '../db/index.js';
 
 // Create properties table
 const createPropertiesTable = async () => {
@@ -17,7 +17,7 @@ const createPropertiesTable = async () => {
       postal_code VARCHAR(20),
       price DECIMAL(10, 2) NOT NULL,
       rating DECIMAL(2, 1) DEFAULT 0,
-      host_id INT NOT NULL,
+      host_id VARCHAR(36) NOT NULL,
       guests INT NOT NULL,
       bedrooms INT NOT NULL,
       beds INT NOT NULL,
@@ -53,6 +53,22 @@ const createPropertiesTable = async () => {
       rule VARCHAR(255),
       PRIMARY KEY (property_id, rule),
       FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+    // Amenities table
+    `CREATE TABLE IF NOT EXISTS amenities (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      name VARCHAR(255) NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+    // Breakfast options table
+    `CREATE TABLE IF NOT EXISTS breakfast_options (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      property_id INT,
+      name VARCHAR(255) NOT NULL,
+      description TEXT NOT NULL,
+      price DECIMAL(10, 2) NOT NULL,
+      FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
   ];
 
@@ -73,25 +89,25 @@ const findPropertiesInRadius = async (lat, lon, radius) => {
     SELECT 
       p.*,
       (
-        6371 * acos(
-          cos(radians(?)) * cos(radians(latitude))
-          * cos(radians(longitude) - radians(?))
-          + sin(radians(?)) * sin(radians(latitude))
-        )
-      ) AS distance
+        SELECT pi.url 
+        FROM property_images pi 
+        WHERE pi.property_id = p.id 
+        LIMIT 1
+      ) as imageUrl,
+      CONCAT(p.street, ', ', p.city, ', ', p.country) as location
     FROM properties p
-    HAVING distance < ?
-    ORDER BY distance
-    LIMIT 20;
+    WHERE ST_Distance_Sphere(
+      point(p.longitude, p.latitude),
+      point(?, ?)
+    ) <= ?
+    ORDER BY ST_Distance_Sphere(
+      point(p.longitude, p.latitude),
+      point(?, ?)
+    );
   `;
 
-  try {
-    const [properties] = await db.query(query, [lat, lon, lat, radius]);
-    return properties;
-  } catch (error) {
-    console.error('Error finding properties:', error);
-    throw error;
-  }
+  const [rows] = await db.query(query, [lon, lat, radius, lon, lat]);
+  return rows;
 };
 
 // Get property details including amenities, images, and rules
@@ -123,8 +139,129 @@ const getPropertyDetails = async (propertyId) => {
   }
 };
 
+// Get property by id including amenities and images
+const getPropertyById = async (id) => {
+  const query = `
+    SELECT 
+      p.*,
+      (
+        SELECT JSON_ARRAYAGG(amenity)
+        FROM property_amenities
+        WHERE property_id = p.id
+      ) as amenities,
+      (
+        SELECT JSON_ARRAYAGG(rule)
+        FROM property_rules
+        WHERE property_id = p.id
+      ) as rules,
+      (
+        SELECT JSON_ARRAYAGG(
+          JSON_OBJECT(
+            'url', url,
+            'caption', caption
+          )
+        )
+        FROM property_images
+        WHERE property_id = p.id
+      ) as images
+    FROM properties p
+    WHERE p.id = ?;
+  `;
+
+  const [result] = await db.query(query, [id]);
+  return result[0];
+};
+
+// Create a new property
+const createProperty = async (propertyData) => {
+  const {
+    name,
+    description,
+    latitude,
+    longitude,
+    street,
+    city,
+    state,
+    country,
+    postalCode,
+    price,
+    hostId,
+    guests,
+    bedrooms,
+    beds,
+    bathrooms,
+    propertyType,
+    checkInTime,
+    checkOutTime,
+    cancellationPolicy,
+    amenities = [],
+    images = [],
+    rules = []
+  } = propertyData;
+
+  const connection = await db.getConnection();
+  
+  try {
+    await connection.beginTransaction();
+
+    // Insert property
+    const [propertyResult] = await connection.query(
+      `INSERT INTO properties (
+        name, description, latitude, longitude, street, city, state, country,
+        postal_code, price, host_id, guests, bedrooms, beds, bathrooms,
+        property_type, check_in_time, check_out_time, cancellation_policy
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        name, description, latitude, longitude, street, city, state, country,
+        postalCode, price, hostId, guests, bedrooms, beds, bathrooms,
+        propertyType, checkInTime, checkOutTime, cancellationPolicy
+      ]
+    );
+
+    const propertyId = propertyResult.insertId;
+
+    // Insert amenities
+    if (amenities.length > 0) {
+      const amenityValues = amenities.map(amenity => [propertyId, amenity]);
+      await connection.query(
+        'INSERT INTO property_amenities (property_id, amenity) VALUES ?',
+        [amenityValues]
+      );
+    }
+
+    // Insert images
+    if (images.length > 0) {
+      const imageValues = images.map(image => [propertyId, image.url, image.caption]);
+      await connection.query(
+        'INSERT INTO property_images (property_id, url, caption) VALUES ?',
+        [imageValues]
+      );
+    }
+
+    // Insert rules
+    if (rules.length > 0) {
+      const ruleValues = rules.map(rule => [propertyId, rule]);
+      await connection.query(
+        'INSERT INTO property_rules (property_id, rule) VALUES ?',
+        [ruleValues]
+      );
+    }
+
+    await connection.commit();
+    return propertyId;
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error creating property:', error);
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
 export {
-  createPropertiesTable,
+  createProperty,
   findPropertiesInRadius,
-  getPropertyDetails
+  getPropertyDetails,
+  getPropertyById
 };

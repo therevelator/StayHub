@@ -1,126 +1,200 @@
-import { AppBar, Toolbar, Button, Box, Container, Typography } from '@mui/material';
+import React from 'react';
 import { styled } from '@mui/material/styles';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import {
+  AppBar,
+  Box,
+  Button,
+  Container,
+  IconButton,
+  Menu,
+  MenuItem,
+  Typography,
+} from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import AddBusinessIcon from '@mui/icons-material/AddBusiness';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: theme.palette.background.paper,
-  boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-  position: 'sticky',
-  top: 0,
-  zIndex: theme.zIndex.appBar,
-}));
-
-const HeaderContainer = styled(Container)(({ theme }) => ({
-  padding: theme.spacing(0, 3),
-}));
-
-const HeaderToolbar = styled(Toolbar)(({ theme }) => ({
-  padding: theme.spacing(2, 0),
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: theme.spacing(4),
+  boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
 }));
 
 const NavigationGroup = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
-  gap: theme.spacing(4),
-}));
-
-const NavButtonsGroup = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  gap: theme.spacing(2),
+  justifyContent: 'space-between',
+  width: '100%',
+  padding: theme.spacing(2),
 }));
 
 const Logo = styled(Typography)(({ theme }) => ({
   color: theme.palette.primary.main,
   fontWeight: 700,
   fontSize: '1.5rem',
-  letterSpacing: '-0.02em',
   textDecoration: 'none',
-  display: 'flex',
-  alignItems: 'center',
-  transition: 'color 0.2s ease',
   '&:hover': {
     color: theme.palette.primary.dark,
   },
 }));
 
-const NavButton = styled(Button)(({ theme }) => ({
-  color: theme.palette.text.primary,
-  padding: '8px 16px',
-  borderRadius: theme.shape.borderRadius,
-  transition: 'all 0.2s ease',
-  '&:hover': {
-    backgroundColor: theme.palette.action.hover,
-    transform: 'translateY(-1px)',
-  },
+const NavButtonsGroup = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  gap: theme.spacing(2),
+  alignItems: 'center',
 }));
 
-const ActionButton = styled(Button)(({ theme }) => ({
-  marginLeft: theme.spacing(2),
-  transition: 'all 0.2s ease',
+const NavButton = styled(Button)(({ theme }) => ({
+  color: theme.palette.text.primary,
+  fontWeight: 500,
   '&:hover': {
-    transform: 'translateY(-1px)',
+    backgroundColor: theme.palette.action.hover,
   },
 }));
 
 const Header = () => {
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const [mobileMenu, setMobileMenu] = React.useState(null);
 
   const handleSignOut = () => {
     logout();
     navigate('/');
   };
 
+  const handleMobileMenuOpen = (event) => {
+    setMobileMenu(event.currentTarget);
+  };
+
+  const handleMobileMenuClose = () => {
+    setMobileMenu(null);
+  };
+
   return (
-    <StyledAppBar elevation={0}>
-      <HeaderContainer maxWidth="xl">
-        <HeaderToolbar disableGutters>
-          <NavigationGroup>
-            <Logo component={RouterLink} to="/" variant="h1">
-              StayHub
-            </Logo>
+    <StyledAppBar position="sticky">
+      <Container maxWidth="xl">
+        <NavigationGroup>
+          <Logo component={RouterLink} to="/" variant="h6">
+            StayHub
+          </Logo>
 
-            <NavButtonsGroup>
-              <NavButton component={RouterLink} to="/">
-                Find Places
-              </NavButton>
-              <NavButton>
-                List Property
-              </NavButton>
-            </NavButtonsGroup>
-          </NavigationGroup>
-
-          <NavButtonsGroup>
+          {/* Desktop Navigation */}
+          <NavButtonsGroup sx={{ display: { xs: 'none', md: 'flex' } }}>
+            <NavButton component={RouterLink} to="/">
+              Find Places
+            </NavButton>
+            
             {isAuthenticated ? (
-              <ActionButton
-                onClick={handleSignOut}
-                variant="outlined"
-                color="primary"
-              >
-                Sign out
-              </ActionButton>
+              <>
+                <NavButton
+                  component={RouterLink}
+                  to="/list-property"
+                  startIcon={<AddBusinessIcon />}
+                  variant="contained"
+                  color="primary"
+                  sx={{
+                    color: 'white',
+                    '&:hover': {
+                      backgroundColor: 'primary.dark',
+                    },
+                  }}
+                >
+                  List Your Property
+                </NavButton>
+                <NavButton onClick={handleSignOut}>Sign Out</NavButton>
+              </>
             ) : (
               <>
                 <NavButton component={RouterLink} to="/signin">
-                  Sign in
+                  Sign In
                 </NavButton>
-                <ActionButton
+                <NavButton
                   component={RouterLink}
                   to="/register"
                   variant="contained"
                   color="primary"
+                  sx={{ color: 'white' }}
                 >
                   Register
-                </ActionButton>
+                </NavButton>
               </>
             )}
           </NavButtonsGroup>
-        </HeaderToolbar>
-      </HeaderContainer>
+
+          {/* Mobile Navigation */}
+          <Box sx={{ display: { xs: 'flex', md: 'none' } }}>
+            <IconButton
+              size="large"
+              aria-label="menu"
+              aria-controls="menu-appbar"
+              aria-haspopup="true"
+              onClick={handleMobileMenuOpen}
+              color="inherit"
+            >
+              <MenuIcon />
+            </IconButton>
+            <Menu
+              id="menu-appbar"
+              anchorEl={mobileMenu}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'right',
+              }}
+              keepMounted
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'right',
+              }}
+              open={Boolean(mobileMenu)}
+              onClose={handleMobileMenuClose}
+            >
+              <MenuItem
+                component={RouterLink}
+                to="/"
+                onClick={handleMobileMenuClose}
+              >
+                Find Places
+              </MenuItem>
+              {isAuthenticated ? (
+                <>
+                  <MenuItem
+                    component={RouterLink}
+                    to="/list-property"
+                    onClick={handleMobileMenuClose}
+                  >
+                    <AddBusinessIcon sx={{ mr: 1 }} />
+                    List Your Property
+                  </MenuItem>
+                  <MenuItem onClick={() => {
+                    handleMobileMenuClose();
+                    handleSignOut();
+                  }}>
+                    Sign Out
+                  </MenuItem>
+                </>
+              ) : (
+                <>
+                  <MenuItem
+                    component={RouterLink}
+                    to="/signin"
+                    onClick={handleMobileMenuClose}
+                  >
+                    Sign In
+                  </MenuItem>
+                  <MenuItem
+                    component={RouterLink}
+                    to="/register"
+                    onClick={handleMobileMenuClose}
+                  >
+                    Register
+                  </MenuItem>
+                </>
+              )}
+            </Menu>
+          </Box>
+        </NavigationGroup>
+      </Container>
     </StyledAppBar>
   );
 };

@@ -1,6 +1,7 @@
 import { Grid, Container, Typography, Box, CircularProgress } from '@mui/material';
 import PropertyCard from './PropertyCard';
 import { styled } from '@mui/material/styles';
+import { useNavigate } from 'react-router-dom';
 
 const NoResults = styled(Box)(({ theme }) => ({
   textAlign: 'center',
@@ -9,6 +10,12 @@ const NoResults = styled(Box)(({ theme }) => ({
 }));
 
 const PropertyGrid = ({ properties, loading, error, searchLocation }) => {
+  const navigate = useNavigate();
+
+  const handlePropertyClick = (propertyId) => {
+    navigate(`/properties/${propertyId}`);
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -48,7 +55,18 @@ const PropertyGrid = ({ properties, loading, error, searchLocation }) => {
       <Grid container spacing={3}>
         {properties.map((property) => (
           <Grid item xs={12} sm={6} md={4} lg={3} key={property.id}>
-            <PropertyCard property={property} />
+            <PropertyCard 
+              property={property} 
+              onClick={() => handlePropertyClick(property.id)}
+              sx={{ 
+                cursor: 'pointer',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: 4,
+                  transition: 'all 0.3s ease-in-out',
+                },
+              }}
+            />
           </Grid>
         ))}
       </Grid>

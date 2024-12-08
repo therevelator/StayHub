@@ -10,6 +10,8 @@ import PropertyTypes from './components/PropertyTypes/PropertyTypes';
 import Destinations from './components/Destinations/Destinations';
 import RegisterForm from './components/Auth/RegisterForm';
 import SignInForm from './components/Auth/SignInForm';
+import PropertyDetails from './components/Property/PropertyDetails';
+import ListProperty from './pages/ListProperty/ListProperty';
 import { AuthProvider } from './context/AuthContext';
 
 // Theme configuration
@@ -111,6 +113,8 @@ function App() {
               />
               <Route path="/register" element={<RegisterForm />} />
               <Route path="/signin" element={<SignInForm />} />
+              <Route path="/list-property" element={<ListProperty />} />
+              <Route path="/properties/:id" element={<PropertyDetails />} />
             </Routes>
           </Router>
         </AuthProvider>

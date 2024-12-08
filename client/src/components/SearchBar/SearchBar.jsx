@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Box, TextField, Button, Container, Paper } from '@mui/material';
+import { Box, TextField, Button, Container, Paper, Divider } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import SearchIcon from '@mui/icons-material/Search';
 import { styled } from '@mui/material/styles';
 import PropertyGrid from '../Property/PropertyGrid';
+import PeopleSelector from './PeopleSelector';
 
 const SearchButton = styled(Button)(({ theme }) => ({
   backgroundColor: '#299d8f',
@@ -26,6 +27,7 @@ const SearchBar = () => {
   const [location, setLocation] = useState('');
   const [checkIn, setCheckIn] = useState(null);
   const [checkOut, setCheckOut] = useState(null);
+  const [guests, setGuests] = useState({ adults: 1, children: 0 });
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -63,6 +65,7 @@ const SearchBar = () => {
           lon,
           checkIn,
           checkOut,
+          guests: guests.adults + guests.children,
           radius: 25, // Start with 25km radius
         }),
       });
@@ -106,44 +109,34 @@ const SearchBar = () => {
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               sx={{ flex: 2 }}
-              InputProps={{
-                sx: { borderRadius: 1 }
-              }}
             />
-            
+            <Divider orientation="vertical" flexItem />
             <LocalizationProvider dateAdapter={AdapterDateFns}>
               <DatePicker
                 label="Check-in"
                 value={checkIn}
                 onChange={setCheckIn}
                 sx={{ flex: 1 }}
-                slotProps={{
-                  textField: {
-                    InputProps: {
-                      sx: { borderRadius: 1 }
-                    }
-                  }
-                }}
+                minDate={new Date()}
               />
               <DatePicker
                 label="Check-out"
                 value={checkOut}
                 onChange={setCheckOut}
                 sx={{ flex: 1 }}
-                slotProps={{
-                  textField: {
-                    InputProps: {
-                      sx: { borderRadius: 1 }
-                    }
-                  }
-                }}
+                minDate={checkIn || new Date()}
               />
             </LocalizationProvider>
-
+            <Divider orientation="vertical" flexItem />
+            <PeopleSelector
+              value={guests}
+              onChange={setGuests}
+            />
             <SearchButton
               type="submit"
               variant="contained"
               startIcon={<SearchIcon />}
+              disabled={loading}
             >
               Search
             </SearchButton>
@@ -151,12 +144,20 @@ const SearchBar = () => {
         </Container>
       </SearchContainer>
 
-      <PropertyGrid
-        properties={properties}
-        loading={loading}
-        error={error}
-        searchLocation={searchLocation}
-      />
+      {error && (
+        <Container maxWidth="xl">
+          <Box sx={{ color: 'error.main', mt: 2 }}>{error}</Box>
+        </Container>
+      )}
+
+      {searchLocation && !loading && !error && (
+        <Container maxWidth="xl">
+          <Box sx={{ mt: 4 }}>
+            <h2>Properties in {searchLocation}</h2>
+            <PropertyGrid properties={properties} />
+          </Box>
+        </Container>
+      )}
     </>
   );
 };

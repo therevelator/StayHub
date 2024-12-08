@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import {
   TextField,
@@ -25,6 +25,7 @@ const SignInForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
 
   const handleChange = (e) => {
@@ -45,8 +46,14 @@ const SignInForm = () => {
     
     try {
       const response = await axios.post('http://localhost:5001/api/auth/login', formData);
-      login(response.data.token, response.data.user);
-      navigate('/');
+      if (response.data.status === 'success' && response.data.data) {
+        const { token, user } = response.data.data;
+        login(token, user);
+        const from = location.state?.from || '/';
+        navigate(from);
+      } else {
+        throw new Error('Invalid response format');
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'An error occurred during sign in');
     }
@@ -158,7 +165,8 @@ const SignInForm = () => {
               >
                 Don't have an account?{' '}
                 <Link 
-                  href="/register" 
+                  component={RouterLink}
+                  to="/register"
                   sx={{ 
                     fontWeight: 500,
                     textDecoration: 'none',
