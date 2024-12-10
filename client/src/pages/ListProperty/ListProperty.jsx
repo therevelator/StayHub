@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../services/api';
 import {
   Box,
   Stepper,
@@ -14,6 +15,7 @@ import {
 import BasicInfoForm from './steps/BasicInfoForm';
 import LocationForm from './steps/LocationForm';
 import AmenitiesForm from './steps/AmenitiesForm';
+import RoomForm from './steps/RoomForm';
 import PhotosForm from './steps/PhotosForm';
 import PricingForm from './steps/PricingForm';
 import RulesForm from './steps/RulesForm';
@@ -22,6 +24,7 @@ const steps = [
   'Basic Information',
   'Location',
   'Amenities',
+  'Rooms',
   'Photos',
   'Pricing',
   'Rules & Policies'
@@ -36,8 +39,10 @@ const ListProperty = () => {
       name: '',
       description: '',
       propertyType: '',
-      starRating: null,
-      languages: [],
+      guests: '',
+      bedrooms: '',
+      beds: '',
+      bathrooms: ''
     },
     location: {
       street: '',
@@ -45,81 +50,54 @@ const ListProperty = () => {
       state: '',
       country: '',
       postalCode: '',
-      latitude: null,
-      longitude: null,
+      coordinates: null
     },
-    amenities: {
-      general: [],
-      room: [],
-      bathroom: [],
-      kitchen: [],
-      outdoor: [],
-      accessibility: [],
-    },
+    amenities: [],
+    rooms: [],
     photos: [],
     pricing: {
-      basePrice: '',
-      cleaningFee: '',
-      serviceFee: '',
-      taxRate: '',
-      securityDeposit: '',
+      price: ''
     },
     rules: {
-      checkInTime: '15:00',
-      checkOutTime: '11:00',
-      cancellationPolicy: 'moderate',
-      houseRules: [],
-      petPolicy: '',
-      eventPolicy: '',
-    },
+      checkInTime: null,
+      checkOutTime: null,
+      cancellationPolicy: '',
+      houseRules: []
+    }
   });
 
-  // Redirect if not logged in
-  React.useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/signin', { state: { from: '/list-property' } });
-    }
-  }, [isAuthenticated, navigate]);
-
   const handleNext = () => {
-    setActiveStep((prevStep) => prevStep + 1);
+    setActiveStep((prevActiveStep) => prevActiveStep + 1);
   };
 
   const handleBack = () => {
-    setActiveStep((prevStep) => prevStep - 1);
-  };
-
-  const handleFormChange = (step, data) => {
-    setFormData(prev => ({
-      ...prev,
-      [step]: { ...prev[step], ...data }
-    }));
+    setActiveStep((prevActiveStep) => prevActiveStep - 1);
   };
 
   const handleSubmit = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5001/api/properties', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...formData,
-          hostId: user.id,
-        }),
-      });
+      // Check if we have coordinates
+      if (!formData.location.coordinates) {
+        throw new Error('Location coordinates are missing. Please select a valid address.');
+      }
 
-      if (response.ok) {
-        const result = await response.json();
-        navigate(`/properties/${result.id}`);
-      } else {
-        throw new Error('Failed to create property');
+      const propertyData = {
+        ...formData,
+        location: {
+          ...formData.location,
+          latitude: formData.location.coordinates.lat,
+          longitude: formData.location.coordinates.lng
+        }
+      };
+
+      const response = await api.post('/properties', propertyData);
+      
+      if (response.status === 201) {
+        navigate(`/properties/${response.data.data.id}`);
       }
     } catch (error) {
       console.error('Error creating property:', error);
-      // Handle error (show notification, etc.)
+      alert(error.message || 'Error creating property. Please try again.');
     }
   };
 
@@ -129,42 +107,49 @@ const ListProperty = () => {
         return (
           <BasicInfoForm
             data={formData.basicInfo}
-            onChange={(data) => handleFormChange('basicInfo', data)}
+            onChange={(data) => setFormData(prev => ({ ...prev, basicInfo: data }))}
           />
         );
       case 1:
         return (
           <LocationForm
             data={formData.location}
-            onChange={(data) => handleFormChange('location', data)}
+            onChange={(data) => setFormData(prev => ({ ...prev, location: data }))}
           />
         );
       case 2:
         return (
           <AmenitiesForm
             data={formData.amenities}
-            onChange={(data) => handleFormChange('amenities', data)}
+            onChange={(data) => setFormData(prev => ({ ...prev, amenities: data }))}
           />
         );
       case 3:
         return (
-          <PhotosForm
-            data={formData.photos}
-            onChange={(data) => handleFormChange('photos', data)}
+          <RoomForm
+            rooms={formData.rooms}
+            onChange={(rooms) => setFormData(prev => ({ ...prev, rooms }))}
           />
         );
       case 4:
         return (
-          <PricingForm
-            data={formData.pricing}
-            onChange={(data) => handleFormChange('pricing', data)}
+          <PhotosForm
+            data={formData.photos}
+            onChange={(data) => setFormData(prev => ({ ...prev, photos: data }))}
           />
         );
       case 5:
         return (
+          <PricingForm
+            data={formData.pricing}
+            onChange={(data) => setFormData(prev => ({ ...prev, pricing: data }))}
+          />
+        );
+      case 6:
+        return (
           <RulesForm
             data={formData.rules}
-            onChange={(data) => handleFormChange('rules', data)}
+            onChange={(data) => setFormData(prev => ({ ...prev, rules: data }))}
           />
         );
       default:
@@ -172,17 +157,13 @@ const ListProperty = () => {
     }
   };
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom align="center">
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Paper sx={{ p: 4 }}>
+        <Typography variant="h4" gutterBottom>
           List Your Property
         </Typography>
-        
+
         <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
           {steps.map((label) => (
             <Step key={label}>
@@ -191,36 +172,22 @@ const ListProperty = () => {
           ))}
         </Stepper>
 
-        <Box>
-          {activeStep === steps.length ? (
-            <Box sx={{ textAlign: 'center' }}>
-              <Typography sx={{ mt: 2, mb: 1 }}>
-                All steps completed - you're ready to list your property!
-              </Typography>
-              <Button onClick={handleSubmit} variant="contained" sx={{ mt: 3 }}>
-                List Property
-              </Button>
-            </Box>
-          ) : (
-            <Box>
-              {getStepContent(activeStep)}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-                <Button
-                  disabled={activeStep === 0}
-                  onClick={handleBack}
-                  variant="outlined"
-                >
-                  Back
-                </Button>
-                <Button
-                  variant="contained"
-                  onClick={handleNext}
-                >
-                  {activeStep === steps.length - 1 ? 'Finish' : 'Next'}
-                </Button>
-              </Box>
-            </Box>
-          )}
+        {getStepContent(activeStep)}
+
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+          <Button
+            color="inherit"
+            disabled={activeStep === 0}
+            onClick={handleBack}
+          >
+            Back
+          </Button>
+          <Button
+            variant="contained"
+            onClick={activeStep === steps.length - 1 ? handleSubmit : handleNext}
+          >
+            {activeStep === steps.length - 1 ? 'Submit' : 'Next'}
+          </Button>
         </Box>
       </Paper>
     </Container>

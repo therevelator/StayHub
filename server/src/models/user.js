@@ -31,7 +31,7 @@ class User {
         'SELECT * FROM users WHERE email = ?',
         [email]
       );
-      console.log('Find by email result:', rows[0]);
+      console.log('Found user by email:', rows[0]);
       return rows[0];
     } catch (error) {
       console.error('Error in User.findByEmail:', error);

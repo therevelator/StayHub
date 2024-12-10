@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink, useLocation } from 'react-router-dom';
-import axios from 'axios';
+import api from '../../services/api';
 import {
   TextField,
   Button,
@@ -42,20 +42,24 @@ const SignInForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    
     try {
-      const response = await axios.post('http://localhost:5001/api/auth/login', formData);
-      if (response.data.status === 'success' && response.data.data) {
+      console.log('Attempting login with:', formData);
+      
+      const response = await api.post('/auth/login', formData);
+      console.log('Login response:', response.data);
+      
+      if (response.data.status === 'success') {
+        // Pass both user data and token to login
         const { token, user } = response.data.data;
-        login(token, user);
-        const from = location.state?.from || '/';
-        navigate(from);
-      } else {
-        throw new Error('Invalid response format');
+        console.log('Login successful:', { token, user });
+        
+        login(user, token);
+        navigate('/');
       }
-    } catch (err) {
-      setError(err.response?.data?.message || 'An error occurred during sign in');
+    } catch (error) {
+      console.error('Login error:', error);
+      console.error('Error response:', error.response?.data);
+      setError(error.response?.data?.message || 'Login failed');
     }
   };
 

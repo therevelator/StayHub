@@ -1,3 +1,4 @@
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -12,7 +13,13 @@ import RegisterForm from './components/Auth/RegisterForm';
 import SignInForm from './components/Auth/SignInForm';
 import PropertyDetails from './components/Property/PropertyDetails';
 import ListProperty from './pages/ListProperty/ListProperty';
+import CreatePropertyWizard from './components/Property/CreatePropertyWizard';
+import EditProperty from './pages/EditProperty/EditProperty';
 import { AuthProvider } from './context/AuthContext';
+import AdminEditProperty from './pages/AdminEditProperty/AdminEditProperty';
+import AdminProperties from './pages/AdminProperties/AdminProperties';
+import SearchResults from './pages/SearchResults/SearchResults';
+import Home from './pages/Home/Home';
 
 // Theme configuration
 const theme = createTheme({
@@ -47,44 +54,56 @@ const theme = createTheme({
     h1: {
       fontSize: '2.5rem',
       fontWeight: 600,
-      letterSpacing: '-0.02em',
+      color: '#264653',
     },
     h2: {
       fontSize: '2rem',
       fontWeight: 600,
-      letterSpacing: '-0.01em',
+      color: '#264653',
     },
     h3: {
       fontSize: '1.75rem',
       fontWeight: 600,
-      letterSpacing: '-0.01em',
+      color: '#264653',
     },
-    button: {
-      textTransform: 'none',
+    h4: {
+      fontSize: '1.5rem',
       fontWeight: 500,
+      color: '#264653',
     },
-  },
-  shape: {
-    borderRadius: 12,
+    h5: {
+      fontSize: '1.25rem',
+      fontWeight: 500,
+      color: '#264653',
+    },
+    h6: {
+      fontSize: '1rem',
+      fontWeight: 500,
+      color: '#264653',
+    },
+    body1: {
+      fontSize: '1rem',
+      color: '#546E7A',
+    },
+    body2: {
+      fontSize: '0.875rem',
+      color: '#546E7A',
+    },
   },
   components: {
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 8,
-          padding: '10px 24px',
-          fontSize: '1rem',
-          boxShadow: 'none',
-          '&:hover': {
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-          },
+          textTransform: 'none',
+          borderRadius: '8px',
+          padding: '8px 16px',
         },
       },
     },
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: 16,
+          borderRadius: '12px',
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         },
       },
@@ -103,18 +122,17 @@ function App() {
             <Routes>
               <Route
                 path="/"
-                element={
-                  <>
-                    <SearchBar />
-                    <PropertyTypes />
-                    <Destinations />
-                  </>
-                }
+                element={<Home />}
               />
               <Route path="/register" element={<RegisterForm />} />
               <Route path="/signin" element={<SignInForm />} />
               <Route path="/list-property" element={<ListProperty />} />
+              <Route path="/create-property-wizard" element={<CreatePropertyWizard />} />
               <Route path="/properties/:id" element={<PropertyDetails />} />
+              <Route path="/properties/:id/edit" element={<EditProperty />} />
+              <Route path="/admin/properties" element={<AdminProperties />} />
+              <Route path="/admin/properties/:id/edit" element={<AdminEditProperty />} />
+              <Route path="/search" element={<SearchResults />} />
             </Routes>
           </Router>
         </AuthProvider>

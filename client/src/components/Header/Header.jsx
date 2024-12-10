@@ -15,6 +15,7 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import AddBusinessIcon from '@mui/icons-material/AddBusiness';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
   backgroundColor: theme.palette.background.paper,
@@ -54,7 +55,7 @@ const NavButton = styled(Button)(({ theme }) => ({
 }));
 
 const Header = () => {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, user } = useAuth();
   const navigate = useNavigate();
   const [mobileMenu, setMobileMenu] = React.useState(null);
 
@@ -72,14 +73,13 @@ const Header = () => {
   };
 
   return (
-    <StyledAppBar position="sticky">
-      <Container maxWidth="xl">
+    <StyledAppBar position="static">
+      <Container>
         <NavigationGroup>
           <Logo component={RouterLink} to="/" variant="h6">
             StayHub
           </Logo>
 
-          {/* Desktop Navigation */}
           <NavButtonsGroup sx={{ display: { xs: 'none', md: 'flex' } }}>
             <NavButton component={RouterLink} to="/">
               Find Places
@@ -91,25 +91,27 @@ const Header = () => {
                   component={RouterLink}
                   to="/list-property"
                   startIcon={<AddBusinessIcon />}
-                  variant="contained"
-                  color="primary"
-                  sx={{
-                    color: 'white',
-                    '&:hover': {
-                      backgroundColor: 'primary.dark',
-                    },
-                  }}
                 >
                   List Your Property
                 </NavButton>
+                {user?.isAdmin && (
+                  <NavButton
+                    component={RouterLink}
+                    to="/admin/properties"
+                    startIcon={<AdminPanelSettingsIcon />}
+                  >
+                    Admin Panel
+                  </NavButton>
+                )}
                 <NavButton onClick={handleSignOut}>Sign Out</NavButton>
               </>
             ) : (
-              <>
-                <NavButton component={RouterLink} to="/signin">
+              [
+                <NavButton key="sign-in" component={RouterLink} to="/signin">
                   Sign In
-                </NavButton>
+                </NavButton>,
                 <NavButton
+                  key="register"
                   component={RouterLink}
                   to="/register"
                   variant="contained"
@@ -118,7 +120,7 @@ const Header = () => {
                 >
                   Register
                 </NavButton>
-              </>
+              ]
             )}
           </NavButtonsGroup>
 
@@ -156,41 +158,57 @@ const Header = () => {
               >
                 Find Places
               </MenuItem>
-              {isAuthenticated ? (
-                <>
+              
+              {isAuthenticated ? [
+                <MenuItem
+                  key="list-property"
+                  component={RouterLink}
+                  to="/list-property"
+                  onClick={handleMobileMenuClose}
+                >
+                  <AddBusinessIcon sx={{ mr: 1 }} />
+                  List Your Property
+                </MenuItem>,
+                
+                user?.isAdmin && (
                   <MenuItem
+                    key="admin-panel"
                     component={RouterLink}
-                    to="/list-property"
+                    to="/admin/properties"
                     onClick={handleMobileMenuClose}
                   >
-                    <AddBusinessIcon sx={{ mr: 1 }} />
-                    List Your Property
+                    <AdminPanelSettingsIcon sx={{ mr: 1 }} />
+                    Admin Panel
                   </MenuItem>
-                  <MenuItem onClick={() => {
+                ),
+                
+                <MenuItem 
+                  key="sign-out"
+                  onClick={() => {
                     handleMobileMenuClose();
                     handleSignOut();
-                  }}>
-                    Sign Out
-                  </MenuItem>
-                </>
-              ) : (
-                <>
-                  <MenuItem
-                    component={RouterLink}
-                    to="/signin"
-                    onClick={handleMobileMenuClose}
-                  >
-                    Sign In
-                  </MenuItem>
-                  <MenuItem
-                    component={RouterLink}
-                    to="/register"
-                    onClick={handleMobileMenuClose}
-                  >
-                    Register
-                  </MenuItem>
-                </>
-              )}
+                  }}
+                >
+                  Sign Out
+                </MenuItem>
+              ].filter(Boolean) : [
+                <MenuItem
+                  key="sign-in"
+                  component={RouterLink}
+                  to="/signin"
+                  onClick={handleMobileMenuClose}
+                >
+                  Sign In
+                </MenuItem>,
+                <MenuItem
+                  key="register"
+                  component={RouterLink}
+                  to="/register"
+                  onClick={handleMobileMenuClose}
+                >
+                  Register
+                </MenuItem>
+              ]}
             </Menu>
           </Box>
         </NavigationGroup>

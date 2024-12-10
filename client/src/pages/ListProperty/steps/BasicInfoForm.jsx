@@ -7,31 +7,14 @@ import {
   MenuItem,
   Box,
   Typography,
-  Rating,
-  Autocomplete,
-  Chip,
 } from '@mui/material';
 
 const propertyTypes = [
-  'hotel',
   'apartment',
-  'villa',
-  'resort',
-  'guesthouse',
-  'hostel',
-];
-
-const languages = [
-  'English',
-  'Romanian',
-  'French',
-  'German',
-  'Spanish',
-  'Italian',
-  'Russian',
-  'Chinese',
-  'Japanese',
-  'Arabic',
+  'house',
+  'room',
+  'hotel',
+  'villa'
 ];
 
 const BasicInfoForm = ({ data, onChange }) => {
@@ -48,7 +31,7 @@ const BasicInfoForm = ({ data, onChange }) => {
       <TextField
         fullWidth
         label="Property Name"
-        value={data.name}
+        value={data.name || ''}
         onChange={handleChange('name')}
         required
       />
@@ -56,7 +39,7 @@ const BasicInfoForm = ({ data, onChange }) => {
       <TextField
         fullWidth
         label="Description"
-        value={data.description}
+        value={data.description || ''}
         onChange={handleChange('description')}
         multiline
         rows={4}
@@ -67,7 +50,7 @@ const BasicInfoForm = ({ data, onChange }) => {
       <FormControl fullWidth required>
         <InputLabel>Property Type</InputLabel>
         <Select
-          value={data.propertyType}
+          value={data.propertyType || ''}
           onChange={handleChange('propertyType')}
           label="Property Type"
         >
@@ -79,41 +62,44 @@ const BasicInfoForm = ({ data, onChange }) => {
         </Select>
       </FormControl>
 
-      <Box>
-        <Typography component="legend">Star Rating (if applicable)</Typography>
-        <Rating
-          name="star-rating"
-          value={data.starRating}
-          precision={0.5}
-          onChange={(event, newValue) => {
-            onChange({ ...data, starRating: newValue });
-          }}
-        />
-      </Box>
+      <TextField
+        fullWidth
+        type="number"
+        label="Maximum Guests"
+        value={data.guests || ''}
+        onChange={handleChange('guests')}
+        required
+        InputProps={{ inputProps: { min: 1 } }}
+      />
 
-      <Autocomplete
-        multiple
-        value={data.languages}
-        onChange={(event, newValue) => {
-          onChange({ ...data, languages: newValue });
-        }}
-        options={languages}
-        renderTags={(value, getTagProps) =>
-          value.map((option, index) => (
-            <Chip
-              label={option}
-              {...getTagProps({ index })}
-              key={option}
-            />
-          ))
-        }
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            label="Languages Spoken"
-            placeholder="Select languages"
-          />
-        )}
+      <TextField
+        fullWidth
+        type="number"
+        label="Number of Bedrooms"
+        value={data.bedrooms || ''}
+        onChange={handleChange('bedrooms')}
+        required
+        InputProps={{ inputProps: { min: 0 } }}
+      />
+
+      <TextField
+        fullWidth
+        type="number"
+        label="Number of Beds"
+        value={data.beds || ''}
+        onChange={handleChange('beds')}
+        required
+        InputProps={{ inputProps: { min: 1 } }}
+      />
+
+      <TextField
+        fullWidth
+        type="number"
+        label="Number of Bathrooms"
+        value={data.bathrooms || ''}
+        onChange={handleChange('bathrooms')}
+        required
+        InputProps={{ inputProps: { min: 0.5, step: 0.5 } }}
       />
     </Box>
   );

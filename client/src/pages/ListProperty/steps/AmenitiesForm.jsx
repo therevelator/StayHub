@@ -67,7 +67,17 @@ const amenitiesData = {
   ],
 };
 
-const AmenitiesForm = ({ data, onChange }) => {
+const AmenitiesForm = ({ 
+  data = {
+    general: [],
+    room: [],
+    bathroom: [],
+    kitchen: [],
+    outdoor: [],
+    accessibility: []
+  }, 
+  onChange 
+}) => {
   const handleChange = (category, amenity) => (event) => {
     const updatedAmenities = event.target.checked
       ? [...data[category], amenity]

@@ -15,6 +15,8 @@ import {
   Button,
   ImageList,
   ImageListItem,
+  Card,
+  CardContent,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -158,6 +160,46 @@ const PropertyDetails = () => {
                 </Grid>
               ))}
             </Grid>
+
+            <Box sx={{ mt: 4 }}>
+              <Typography variant="h5" gutterBottom>
+                Rooms
+              </Typography>
+              {property.rooms && property.rooms.length > 0 ? (
+                <Grid container spacing={3}>
+                  {property.rooms.map((room, index) => (
+                    <Grid item xs={12} sm={6} md={4} key={index}>
+                      <Card>
+                        <CardContent>
+                          <Typography variant="h6" gutterBottom>
+                            {room.name}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" paragraph>
+                            {room.description}
+                          </Typography>
+                          <Typography variant="body2">
+                            <strong>Room Type:</strong> {room.room_type}
+                          </Typography>
+                          <Typography variant="body2">
+                            <strong>Bed Type:</strong> {room.bed_type}
+                          </Typography>
+                          <Typography variant="body2">
+                            <strong>Max Occupancy:</strong> {room.max_occupancy} guests
+                          </Typography>
+                          <Typography variant="body2">
+                            <strong>Price per Night:</strong> ${room.base_price}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              ) : (
+                <Typography color="text.secondary">
+                  No rooms information available
+                </Typography>
+              )}
+            </Box>
           </Paper>
         </Grid>
 

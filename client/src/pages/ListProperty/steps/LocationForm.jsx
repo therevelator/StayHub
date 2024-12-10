@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   TextField,
   Box,
@@ -26,10 +26,15 @@ const LocationForm = ({ data, onChange }) => {
       const results = await response.json();
 
       if (results && results.length > 0) {
+        const lat = parseFloat(results[0].lat);
+        const lng = parseFloat(results[0].lon);
+        
         onChange({
           ...data,
-          latitude: parseFloat(results[0].lat),
-          longitude: parseFloat(results[0].lon),
+          coordinates: {
+            lat,
+            lng
+          }
         });
         setAddressError('');
       } else {
@@ -40,6 +45,13 @@ const LocationForm = ({ data, onChange }) => {
       console.error('Geocoding error:', error);
     }
   };
+
+  // Add auto-geocoding when address fields change
+  useEffect(() => {
+    if (data.street && data.city && data.country) {
+      handleGeocoding();
+    }
+  }, [data.street, data.city, data.country]);
 
   return (
     <Box sx={{ '& > :not(style)': { mb: 3 } }}>

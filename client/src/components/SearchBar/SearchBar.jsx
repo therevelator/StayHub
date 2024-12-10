@@ -1,51 +1,31 @@
-import { useState } from 'react';
-import { Box, TextField, Button, Container, Paper, Divider } from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import React, { useState } from 'react';
+import api from '../../services/api';
+import {
+  Paper,
+  InputBase,
+  IconButton,
+  Box,
+  TextField,
+  CircularProgress
+} from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import { styled } from '@mui/material/styles';
-import PropertyGrid from '../Property/PropertyGrid';
-import PeopleSelector from './PeopleSelector';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import dayjs from 'dayjs';
 
-const SearchButton = styled(Button)(({ theme }) => ({
-  backgroundColor: '#299d8f',
-  color: 'white',
-  padding: '12px 24px',
-  '&:hover': {
-    backgroundColor: '#005999',
-  },
-}));
-
-const SearchContainer = styled(Box)(({ theme }) => ({
-  backgroundColor: '#1f7a6d',
-  padding: theme.spacing(3, 0),
-  marginBottom: theme.spacing(4),
-}));
-
-const SearchBar = () => {
+const SearchBar = ({ onSearchResults }) => {
   const [location, setLocation] = useState('');
   const [checkIn, setCheckIn] = useState(null);
   const [checkOut, setCheckOut] = useState(null);
-  const [guests, setGuests] = useState({ adults: 1, children: 0 });
-  const [properties, setProperties] = useState([]);
+  const [guests, setGuests] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [searchLocation, setSearchLocation] = useState('');
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!location) return;
-
-    setLoading(true);
-    setError(null);
-    setSearchLocation(location);
-
+  const handleSearch = async () => {
     try {
-      // First, get coordinates for the location
-      const geocodeResponse = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}`
-      );
+      setLoading(true);
+
+      // First get coordinates for the location
+      const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}`;
+      const geocodeResponse = await fetch(geocodeUrl);
       const geocodeData = await geocodeResponse.json();
 
       if (!geocodeData.length) {
@@ -54,111 +34,96 @@ const SearchBar = () => {
 
       const { lat, lon } = geocodeData[0];
 
-      // Then search for properties near these coordinates
-      const response = await fetch(`/api/properties/search`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          lat,
-          lon,
-          checkIn,
-          checkOut,
-          guests: guests.adults + guests.children,
-          radius: 25, // Start with 25km radius
-        }),
+      // Then search properties with these coordinates
+      const searchParams = {
+        lat: parseFloat(lat),
+        lon: parseFloat(lon),
+        radius: 25,
+        guests: guests || 1,
+        checkIn: checkIn ? dayjs(checkIn).format('YYYY-MM-DD') : null,
+        checkOut: checkOut ? dayjs(checkOut).format('YYYY-MM-DD') : null
+      };
+
+      const response = await api.get('/properties/search', { 
+        params: searchParams 
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch properties');
+      if (response.data.status === 'success') {
+        onSearchResults({
+          results: response.data.data,
+          searchParams: {
+            location,
+            ...searchParams
+          }
+        });
+      } else {
+        throw new Error(response.data.message || 'Search failed');
       }
-
-      const data = await response.json();
-      setProperties(data);
-    } catch (err) {
-      setError(err.message);
-      setProperties([]);
+    } catch (error) {
+      console.error('Search error:', error);
+      alert(error.message || 'Error performing search. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <>
-      <SearchContainer>
-        <Container maxWidth="xl">
-          <Box sx={{ color: 'white', mb: 3 }}>
-            <h1 style={{ margin: 0, fontSize: '2rem' }}>Find your perfect stay</h1>
-            <p style={{ margin: '8px 0' }}>Discover amazing places to stay around the world</p>
-          </Box>
-          
-          <Paper
-            component="form"
-            onSubmit={handleSearch}
-            sx={{
-              display: 'flex',
-              gap: 1,
-              p: 1,
-              borderRadius: 2,
-              boxShadow: 3,
-            }}
-          >
-            <TextField
-              placeholder="Where are you going?"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              sx={{ flex: 2 }}
-            />
-            <Divider orientation="vertical" flexItem />
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <DatePicker
-                label="Check-in"
-                value={checkIn}
-                onChange={setCheckIn}
-                sx={{ flex: 1 }}
-                minDate={new Date()}
-              />
-              <DatePicker
-                label="Check-out"
-                value={checkOut}
-                onChange={setCheckOut}
-                sx={{ flex: 1 }}
-                minDate={checkIn || new Date()}
-              />
-            </LocalizationProvider>
-            <Divider orientation="vertical" flexItem />
-            <PeopleSelector
-              value={guests}
-              onChange={setGuests}
-            />
-            <SearchButton
-              type="submit"
-              variant="contained"
-              startIcon={<SearchIcon />}
-              disabled={loading}
-            >
-              Search
-            </SearchButton>
-          </Paper>
-        </Container>
-      </SearchContainer>
+    <Paper
+      component="form"
+      sx={{
+        p: 2,
+        display: 'flex',
+        alignItems: 'center',
+        width: '100%',
+        maxWidth: 800,
+        margin: 'auto'
+      }}
+      elevation={3}
+    >
+      <Box sx={{ flex: 2, mr: 2 }}>
+        <InputBase
+          fullWidth
+          placeholder="Where are you going?"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          sx={{ ml: 1 }}
+        />
+      </Box>
 
-      {error && (
-        <Container maxWidth="xl">
-          <Box sx={{ color: 'error.main', mt: 2 }}>{error}</Box>
-        </Container>
-      )}
+      <Box sx={{ display: 'flex', alignItems: 'center', flex: 3 }}>
+        <DatePicker
+          label="Check-in"
+          value={checkIn}
+          onChange={setCheckIn}
+          sx={{ mr: 2 }}
+          slotProps={{ textField: { size: 'small' } }}
+        />
+        <DatePicker
+          label="Check-out"
+          value={checkOut}
+          onChange={setCheckOut}
+          sx={{ mr: 2 }}
+          slotProps={{ textField: { size: 'small' } }}
+        />
+        <TextField
+          type="number"
+          label="Guests"
+          value={guests}
+          onChange={(e) => setGuests(parseInt(e.target.value) || 1)}
+          size="small"
+          InputProps={{ inputProps: { min: 1 } }}
+          sx={{ width: 100 }}
+        />
+      </Box>
 
-      {searchLocation && !loading && !error && (
-        <Container maxWidth="xl">
-          <Box sx={{ mt: 4 }}>
-            <h2>Properties in {searchLocation}</h2>
-            <PropertyGrid properties={properties} />
-          </Box>
-        </Container>
-      )}
-    </>
+      <IconButton 
+        onClick={handleSearch} 
+        disabled={loading || !location}
+        sx={{ ml: 2 }}
+      >
+        {loading ? <CircularProgress size={24} /> : <SearchIcon />}
+      </IconButton>
+    </Paper>
   );
 };
 

@@ -33,7 +33,19 @@ const cancellationPolicies = [
   },
 ];
 
-const RulesForm = ({ data, onChange }) => {
+const RulesForm = ({ 
+  data = {
+    checkInTime: null,
+    checkOutTime: null,
+    cancellationPolicy: '',
+    houseRules: [],
+    restrictions: [],
+    additionalRules: [],
+    petPolicy: '',
+    eventPolicy: ''
+  }, 
+  onChange 
+}) => {
   const [newRule, setNewRule] = React.useState('');
 
   const handleChange = (field) => (event) => {
@@ -43,7 +55,7 @@ const RulesForm = ({ data, onChange }) => {
   const handleTimeChange = (field) => (newValue) => {
     onChange({
       ...data,
-      [field]: newValue ? newValue.format('HH:mm') : null,
+      [field]: newValue
     });
   };
 
@@ -72,13 +84,13 @@ const RulesForm = ({ data, onChange }) => {
         <Stack direction="row" spacing={2}>
           <TimePicker
             label="Check-in Time"
-            value={dayjs(data.checkInTime, 'HH:mm')}
+            value={data.checkInTime}
             onChange={handleTimeChange('checkInTime')}
             sx={{ flex: 1 }}
           />
           <TimePicker
             label="Check-out Time"
-            value={dayjs(data.checkOutTime, 'HH:mm')}
+            value={data.checkOutTime}
             onChange={handleTimeChange('checkOutTime')}
             sx={{ flex: 1 }}
           />

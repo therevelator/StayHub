@@ -1,17 +1,13 @@
-import { findPropertiesInRadius, getPropertyDetails, getPropertyById, createProperty } from '../models/property.model.js';
+import { findPropertiesInRadius, getPropertyDetails, getPropertyById, createProperty, updateProperty, deleteProperty } from '../models/property.model.js';
+import { createRoom, getRoomsByPropertyId } from '../models/room.model.js';
 import axios from 'axios';
+import db from '../db/index.js';
 
 // Function to map frontend property types to database enum values
 const mapPropertyType = (frontendType) => {
-  const typeMapping = {
-    'resort': 'hotel',
-    'apartment': 'apartment',
-    'house': 'house',
-    'room': 'room',
-    'hotel': 'hotel',
-    'villa': 'villa'
-  };
-  return typeMapping[frontendType.toLowerCase()] || 'hotel';
+  const validTypes = ['hotel', 'apartment', 'villa', 'resort', 'guesthouse', 'hostel'];
+  const type = frontendType?.toLowerCase();
+  return validTypes.includes(type) ? type : 'hotel';
 };
 
 // Function to get coordinates from address using OpenStreetMap Nominatim
@@ -47,143 +43,235 @@ const getCoordinates = async (address) => {
 
 const searchProperties = async (req, res) => {
   try {
-    const { lat, lon, radius = 25, checkIn, checkOut, guests } = req.body;
+    console.log('Search request:', req.query); // Log the query params
+
+    const { lat, lon, radius = 25, checkIn, checkOut, guests } = req.query;
     
     if (!lat || !lon) {
-      return res.status(400).json({ message: 'Latitude and longitude are required' });
+      return res.status(400).json({ 
+        status: 'error',
+        message: 'Latitude and longitude are required' 
+      });
     }
 
+    // Convert string parameters to numbers
+    const searchParams = {
+      lat: parseFloat(lat),
+      lon: parseFloat(lon),
+      radius: parseFloat(radius) * 1000, // Convert km to meters
+      guests: parseInt(guests) || 1
+    };
+
+    console.log('Searching with params:', searchParams);
+
     const properties = await findPropertiesInRadius(
-      lat,
-      lon,
-      radius * 1000 // Convert km to meters
+      searchParams.lat,
+      searchParams.lon,
+      searchParams.radius
     );
 
-    res.json(properties);
+    res.json({
+      status: 'success',
+      data: properties
+    });
   } catch (error) {
     console.error('Error searching properties:', error);
-    res.status(500).json({ message: 'Error searching properties' });
+    res.status(500).json({ 
+      status: 'error',
+      message: 'Error searching properties',
+      details: error.message 
+    });
   }
 };
 
 const getPropertyDetailsById = async (req, res) => {
   try {
+    console.log('Getting property details for ID:', req.params.id);
     const { id } = req.params;
+    
+    console.log('Fetching property from database...');
     const property = await getPropertyById(id);
+    console.log('Property from database:', property);
     
     if (!property) {
-      return res.status(404).json({ error: 'Property not found' });
+      console.log('Property not found');
+      return res.status(404).json({
+        status: 'error',
+        message: 'Property not found'
+      });
     }
-
-    res.json(property);
+    
+    console.log('Fetching rooms for property...');
+    const rooms = await getRoomsByPropertyId(id);
+    console.log('Rooms from database:', rooms);
+    
+    const response = {
+      status: 'success',
+      data: {
+        ...property,
+        rooms
+      }
+    };
+    console.log('Sending response:', response);
+    
+    res.json(response);
   } catch (error) {
-    console.error('Error fetching property:', error);
-    res.status(500).json({ error: 'Failed to fetch property details' });
+    console.error('Error in getPropertyDetailsById:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch property details',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
 const createNewProperty = async (req, res) => {
   try {
-    console.log('Received property data:', JSON.stringify(req.body, null, 2));
-    const { basicInfo, location, pricing, amenities, rules } = req.body;
-    
-    // Get coordinates from address
-    const fullAddress = `${location.street}, ${location.city}, ${location.country}`;
-    console.log('Attempting to geocode address:', fullAddress);
-    
-    let coordinates;
-    try {
-      coordinates = await getCoordinates(fullAddress);
-      console.log('Successfully got coordinates:', coordinates);
-    } catch (error) {
-      console.error('Failed to get coordinates:', error.message);
-      return res.status(400).json({
-        message: 'Could not get coordinates for the provided address. Please check the address and try again.'
-      });
-    }
-    
-    // Transform nested data into flat structure
+    const hostId = req.user.id; // From auth middleware
     const propertyData = {
-      // Basic Info
-      name: basicInfo.name,
-      description: basicInfo.description,
-      propertyType: mapPropertyType(basicInfo.propertyType),
-      
-      // Location
-      street: location.street,
-      city: location.city,
-      state: location.state,
-      country: location.country,
-      postalCode: location.postalCode,
-      latitude: coordinates.latitude,
-      longitude: coordinates.longitude,
-      
-      // Pricing
-      price: parseFloat(pricing.basePrice),
-      
-      // Default values for required fields
-      guests: 4, 
-      bedrooms: 2,
-      beds: 2,
-      bathrooms: 2,
-      
-      // Optional fields
-      amenities: amenities ? Object.values(amenities).flat() : [],
-      checkInTime: rules.checkInTime,
-      checkOutTime: rules.checkOutTime,
-      cancellationPolicy: rules.cancellationPolicy,
-      
-      // Host ID from authenticated user
-      hostId: req.user ? req.user.id : req.body.hostId 
+      ...req.body,
+      host_id: hostId
     };
 
-    console.log('Transformed property data:', JSON.stringify(propertyData, null, 2));
-
-    // Validate required fields
-    const requiredFields = [
-      'name',
-      'description',
-      'latitude',
-      'longitude',
-      'street',
-      'city',
-      'country',
-      'price',
-      'guests',
-      'bedrooms',
-      'beds',
-      'bathrooms',
-      'propertyType'
-    ];
-
-    const missingFields = requiredFields.filter(field => !propertyData[field]);
-    if (missingFields.length > 0) {
-      console.error('Missing required fields:', missingFields);
-      return res.status(400).json({
-        message: `Missing required fields: ${missingFields.join(', ')}`
-      });
-    }
-
-    // Validate propertyType against allowed values
-    const allowedPropertyTypes = ['apartment', 'house', 'room', 'hotel', 'villa'];
-    if (!allowedPropertyTypes.includes(propertyData.propertyType)) {
-      console.error('Invalid property type:', propertyData.propertyType);
-      return res.status(400).json({
-        message: `Invalid property type. Allowed values are: ${allowedPropertyTypes.join(', ')}`
-      });
-    }
-
-    // Create the property
-    const propertyId = await createProperty(propertyData);
-    console.log('Created property with ID:', propertyId);
-
-    // Return the newly created property
-    const newProperty = await getPropertyById(propertyId);
-    res.status(201).json(newProperty);
+    const newProperty = await createProperty(propertyData);
+    res.status(201).json({
+      status: 'success',
+      data: newProperty
+    });
   } catch (error) {
     console.error('Error creating property:', error);
-    res.status(500).json({ message: 'Error creating property', error: error.message });
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
   }
 };
 
-export { searchProperties, getPropertyDetailsById, createNewProperty };
+const updatePropertyById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const hostId = req.user.id;
+    
+    // Verify ownership
+    const property = await getPropertyById(id);
+    if (!property) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+    
+    if (property.host_id !== hostId && !req.user.isAdmin) {
+      return res.status(403).json({ message: 'Not authorized to update this property' });
+    }
+
+    const updatedProperty = await updateProperty(id, req.body);
+    res.json({
+      status: 'success',
+      data: updatedProperty
+    });
+  } catch (error) {
+    console.error('Error updating property:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+const deletePropertyById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const hostId = req.user.id;
+    
+    // Verify ownership
+    const property = await getPropertyById(id);
+    if (!property) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+    
+    if (property.host_id !== hostId && !req.user.isAdmin) {
+      return res.status(403).json({ message: 'Not authorized to delete this property' });
+    }
+
+    await deleteProperty(id);
+    res.json({
+      status: 'success',
+      message: 'Property deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting property:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+export const getAllProperties = async (req, res) => {
+  try {
+    console.log('Getting all properties. User:', req.user);
+
+    // Default query without user filtering
+    let query = `
+      SELECT 
+        p.*,
+        u.email as host_email,
+        u.first_name as host_first_name,
+        u.last_name as host_last_name,
+        (
+          SELECT pi.url 
+          FROM property_images pi 
+          WHERE pi.property_id = p.id 
+          LIMIT 1
+        ) as imageUrl
+      FROM properties p
+      LEFT JOIN users u ON p.host_id COLLATE utf8mb4_unicode_ci = u.id COLLATE utf8mb4_unicode_ci
+    `;
+
+    let queryParams = [];
+
+    // Add user filtering only if user exists and is not admin
+    if (req.user && !req.user.isAdmin) {
+      query += ' WHERE p.host_id COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci';
+      queryParams.push(req.user.userId);
+    }
+
+    // Add ordering
+    query += ' ORDER BY p.created_at DESC';
+
+    console.log('Executing query:', {
+      query,
+      params: queryParams,
+      user: req.user || 'No user'
+    });
+
+    const [properties] = await db.query(query, queryParams);
+    
+    console.log(`Found ${properties.length} properties`);
+    
+    // Transform price fields to match the expected format
+    const formattedProperties = properties.map(property => ({
+      ...property,
+      price: property.base_price, // Use base_price as price
+      base_price: parseFloat(property.base_price),
+      cleaning_fee: parseFloat(property.cleaning_fee),
+      service_fee: parseFloat(property.service_fee),
+      tax_rate: parseFloat(property.tax_rate),
+      security_deposit: parseFloat(property.security_deposit)
+    }));
+
+    res.json({
+      status: 'success',
+      data: formattedProperties
+    });
+  } catch (error) {
+    console.error('Error fetching properties:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      status: 'error',
+      message: 'Error fetching properties',
+      details: error.message
+    });
+  }
+};
+
+export { searchProperties, getPropertyDetailsById, createNewProperty, updatePropertyById, deletePropertyById };
