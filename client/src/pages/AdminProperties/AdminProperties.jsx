@@ -1,114 +1,149 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../services/api';
 import {
   Container,
   Paper,
+  Typography,
+  Button,
+  Box,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Button,
-  Typography,
-  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText
 } from '@mui/material';
 
 const AdminProperties = () => {
-  const [properties, setProperties] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
+  const [properties, setProperties] = useState([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [propertyToDelete, setPropertyToDelete] = useState(null);
 
   useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-        console.log('Fetching properties...');
-        const response = await api.get('/properties');
-        console.log('Properties response:', response.data);
-        
-        if (response.data.status === 'success') {
-          setProperties(response.data.data);
-        } else {
-          throw new Error('Failed to load properties');
-        }
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching properties:', error);
-        setError(error.message || 'Failed to load properties');
-        setLoading(false);
-      }
-    };
+    fetchProperties();
+  }, []);
 
-    if (isAuthenticated && user?.isAdmin) {
-      fetchProperties();
+  const fetchProperties = async () => {
+    try {
+      console.log('Fetching properties...');
+      const response = await api.get('/properties');
+      console.log('Properties response:', response.data);
+      if (response.data.status === 'success') {
+        setProperties(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching properties:', error);
     }
-  }, [isAuthenticated, user]);
+  };
 
   const handleEdit = (propertyId) => {
     navigate(`/admin/properties/${propertyId}/edit`);
   };
 
-  if (!isAuthenticated) {
-    return <Alert severity="error">Please sign in to access this page.</Alert>;
-  }
+  const handleDeleteClick = (property) => {
+    setPropertyToDelete(property);
+    setDeleteDialogOpen(true);
+  };
 
-  if (!user?.isAdmin) {
-    return <Alert severity="error">Access denied. Admin privileges required.</Alert>;
-  }
+  const handleDeleteConfirm = async () => {
+    try {
+      await api.delete(`/properties/${propertyToDelete.id}`);
+      setDeleteDialogOpen(false);
+      setPropertyToDelete(null);
+      // Refresh the properties list
+      fetchProperties();
+    } catch (error) {
+      console.error('Error deleting property:', error);
+      alert('Failed to delete property');
+    }
+  };
 
-  if (loading) {
-    return <Alert severity="info">Loading properties...</Alert>;
-  }
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setPropertyToDelete(null);
+  };
 
-  if (error) {
-    return <Alert severity="error">{error}</Alert>;
-  }
+  // Only show delete button if user is admin
+  const showDeleteButton = user?.role === 'admin';
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Paper sx={{ p: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          Manage Properties
-        </Typography>
-        
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h4">Properties</Typography>
+        </Box>
+
         <TableContainer>
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
                 <TableCell>Name</TableCell>
                 <TableCell>Location</TableCell>
                 <TableCell>Type</TableCell>
-                <TableCell>Price</TableCell>
-                <TableCell>Actions</TableCell>
+                <TableCell>Host</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {properties.map((property) => (
                 <TableRow key={property.id}>
-                  <TableCell>{property.id}</TableCell>
                   <TableCell>{property.name}</TableCell>
                   <TableCell>{`${property.city}, ${property.country}`}</TableCell>
                   <TableCell>{property.property_type}</TableCell>
-                  <TableCell>${property.price}</TableCell>
-                  <TableCell>
+                  <TableCell>{property.host_email}</TableCell>
+                  <TableCell align="right">
                     <Button
-                      variant="contained"
+                      variant="outlined"
                       color="primary"
                       onClick={() => handleEdit(property.id)}
+                      sx={{ mr: 1 }}
                     >
                       Edit
                     </Button>
+                    {showDeleteButton && (
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={() => handleDeleteClick(property)}
+                      >
+                        Delete
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </TableContainer>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog
+          open={deleteDialogOpen}
+          onClose={handleDeleteCancel}
+        >
+          <DialogTitle>Confirm Delete</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to delete the property "{propertyToDelete?.name}"? 
+              This action cannot be undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDeleteCancel}>Cancel</Button>
+            <Button onClick={handleDeleteConfirm} color="error" autoFocus>
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Paper>
     </Container>
   );

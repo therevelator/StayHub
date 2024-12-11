@@ -84,7 +84,7 @@ const createPropertiesTable = async () => {
 };
 
 // Find properties within radius using Haversine formula
-const findPropertiesInRadius = async (lat, lon, radius, guests) => {
+const findPropertiesInRadius = async (lat, lon, radius, guests, propertyType) => {
   const query = `
     SELECT 
       p.*,
@@ -122,13 +122,18 @@ const findPropertiesInRadius = async (lat, lon, radius, guests) => {
         )
       ) AS distance
     FROM properties p
+    ${propertyType ? 'WHERE LOWER(p.property_type) = LOWER(?)' : ''}
     HAVING distance <= ? AND JSON_LENGTH(rooms) > 0
     ORDER BY distance;
   `;
 
   try {
-    console.log('Executing search query with params:', { lat, lon, radius: radius/1000, guests });
-    const [rows] = await db.query(query, [guests, lat, lon, lat, radius/1000]);
+    console.log('Executing search query with params:', { lat, lon, radius: radius/1000, guests, propertyType });
+    const queryParams = propertyType 
+      ? [guests, lat, lon, lat, propertyType, radius/1000]
+      : [guests, lat, lon, lat, radius/1000];
+    console.log('Query params:', queryParams);
+    const [rows] = await db.query(query, queryParams);
     console.log(`Found ${rows.length} properties within ${radius/1000}km radius`);
     
     return rows.map(property => {

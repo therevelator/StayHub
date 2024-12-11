@@ -6,17 +6,29 @@ import {
   IconButton,
   Box,
   TextField,
-  CircularProgress
+  CircularProgress,
+  MenuItem
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
+
+const propertyTypes = [
+  'Any',
+  'Hotel',
+  'Apartment',
+  'Villa',
+  'Resort',
+  'Guesthouse',
+  'Hostel'
+];
 
 const SearchBar = ({ onSearchResults }) => {
   const [location, setLocation] = useState('');
   const [checkIn, setCheckIn] = useState(null);
   const [checkOut, setCheckOut] = useState(null);
   const [guests, setGuests] = useState(1);
+  const [propertyType, setPropertyType] = useState('Any');
   const [loading, setLoading] = useState(false);
 
   const handleSearch = async () => {
@@ -41,7 +53,8 @@ const SearchBar = ({ onSearchResults }) => {
         radius: 25,
         guests: parseInt(guests) || 1,
         checkIn: checkIn ? dayjs(checkIn).format('YYYY-MM-DD') : null,
-        checkOut: checkOut ? dayjs(checkOut).format('YYYY-MM-DD') : null
+        checkOut: checkOut ? dayjs(checkOut).format('YYYY-MM-DD') : null,
+        propertyType: propertyType === 'Any' ? null : propertyType
       };
 
       console.log('Searching with params:', searchParams);
@@ -94,19 +107,17 @@ const SearchBar = ({ onSearchResults }) => {
         />
       </Box>
 
-      <Box sx={{ display: 'flex', alignItems: 'center', flex: 3 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', flex: 3, gap: 2 }}>
         <DatePicker
           label="Check-in"
           value={checkIn}
           onChange={setCheckIn}
-          sx={{ mr: 2 }}
           slotProps={{ textField: { size: 'small' } }}
         />
         <DatePicker
           label="Check-out"
           value={checkOut}
           onChange={setCheckOut}
-          sx={{ mr: 2 }}
           slotProps={{ textField: { size: 'small' } }}
         />
         <TextField
@@ -118,6 +129,20 @@ const SearchBar = ({ onSearchResults }) => {
           InputProps={{ inputProps: { min: 1 } }}
           sx={{ width: 100 }}
         />
+        <TextField
+          select
+          label="Type"
+          value={propertyType}
+          onChange={(e) => setPropertyType(e.target.value)}
+          size="small"
+          sx={{ width: 120 }}
+        >
+          {propertyTypes.map((type) => (
+            <MenuItem key={type} value={type}>
+              {type}
+            </MenuItem>
+          ))}
+        </TextField>
       </Box>
 
       <IconButton 

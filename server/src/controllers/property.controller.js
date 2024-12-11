@@ -45,7 +45,7 @@ const searchProperties = async (req, res) => {
   try {
     console.log('Search request:', req.query);
 
-    const { lat, lon, radius = 25, guests } = req.query;
+    const { lat, lon, radius = 25, guests, propertyType } = req.query;
     
     if (!lat || !lon) {
       return res.status(400).json({ 
@@ -59,7 +59,8 @@ const searchProperties = async (req, res) => {
       lat: parseFloat(lat),
       lon: parseFloat(lon),
       radius: parseFloat(radius) * 1000, // Convert km to meters
-      guests: parseInt(guests) || 1
+      guests: parseInt(guests) || 1,
+      propertyType: propertyType
     };
 
     console.log('Searching with params:', searchParams);
@@ -68,7 +69,8 @@ const searchProperties = async (req, res) => {
       searchParams.lat,
       searchParams.lon,
       searchParams.radius,
-      searchParams.guests
+      searchParams.guests,
+      searchParams.propertyType
     );
 
     console.log(`Found ${properties.length} properties`);
@@ -197,16 +199,22 @@ const updatePropertyById = async (req, res) => {
 const deletePropertyById = async (req, res) => {
   try {
     const { id } = req.params;
-    const hostId = req.user.id;
     
-    // Verify ownership
+    // Only allow admin to delete properties
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        status: 'error',
+        message: 'Only administrators can delete properties' 
+      });
+    }
+
+    // Check if property exists
     const property = await getPropertyById(id);
     if (!property) {
-      return res.status(404).json({ message: 'Property not found' });
-    }
-    
-    if (property.host_id !== hostId && !req.user.isAdmin) {
-      return res.status(403).json({ message: 'Not authorized to delete this property' });
+      return res.status(404).json({
+        status: 'error',
+        message: 'Property not found'
+      });
     }
 
     await deleteProperty(id);
