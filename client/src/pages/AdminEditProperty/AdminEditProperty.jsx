@@ -19,15 +19,15 @@ import BasicInfoForm from '../ListProperty/steps/BasicInfoForm';
 import LocationForm from '../ListProperty/steps/LocationForm';
 import AmenitiesForm from '../ListProperty/steps/AmenitiesForm';
 import PhotosForm from '../ListProperty/steps/PhotosForm';
-import PricingForm from '../ListProperty/steps/PricingForm';
 import RulesForm from '../ListProperty/steps/RulesForm';
+import RoomForm from '../ListProperty/steps/RoomForm';
 
 const steps = [
   'Basic Information',
   'Location',
   'Amenities',
+  'Rooms',
   'Photos',
-  'Pricing',
   'Rules & Policies'
 ];
 
@@ -115,16 +115,28 @@ const AdminEditProperty = () => {
         );
       case 3:
         return (
-          <PhotosForm
-            data={formData.photos}
-            onChange={(data) => setFormData(prev => ({ ...prev, photos: data }))}
+          <RoomForm
+            data={formData.rooms}
+            onChange={(data) => {
+              // Calculate total max guests from rooms
+              const totalGuests = data.reduce((sum, room) => sum + (room.maxOccupancy || 0), 0);
+              
+              setFormData(prev => ({
+                ...prev,
+                rooms: data,
+                basicInfo: {
+                  ...prev.basicInfo,
+                  guests: totalGuests.toString()
+                }
+              }));
+            }}
           />
         );
       case 4:
         return (
-          <PricingForm
-            data={formData.pricing}
-            onChange={(data) => setFormData(prev => ({ ...prev, pricing: data }))}
+          <PhotosForm
+            data={formData.photos}
+            onChange={(data) => setFormData(prev => ({ ...prev, photos: data }))}
           />
         );
       case 5:

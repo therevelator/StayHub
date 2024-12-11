@@ -39,14 +39,18 @@ const SearchBar = ({ onSearchResults }) => {
         lat: parseFloat(lat),
         lon: parseFloat(lon),
         radius: 25,
-        guests: guests || 1,
+        guests: parseInt(guests) || 1,
         checkIn: checkIn ? dayjs(checkIn).format('YYYY-MM-DD') : null,
         checkOut: checkOut ? dayjs(checkOut).format('YYYY-MM-DD') : null
       };
 
+      console.log('Searching with params:', searchParams);
+
       const response = await api.get('/properties/search', { 
         params: searchParams 
       });
+
+      console.log('Search response:', response.data);
 
       if (response.data.status === 'success') {
         onSearchResults({

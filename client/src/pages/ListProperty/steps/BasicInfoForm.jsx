@@ -64,12 +64,11 @@ const BasicInfoForm = ({ data, onChange }) => {
 
       <TextField
         fullWidth
-        type="number"
         label="Maximum Guests"
-        value={data.guests || ''}
-        onChange={handleChange('guests')}
-        required
-        InputProps={{ inputProps: { min: 1 } }}
+        value={data.guests}
+        disabled
+        helperText="Maximum guests is calculated from room occupancy"
+        sx={{ mb: 2 }}
       />
 
       <TextField

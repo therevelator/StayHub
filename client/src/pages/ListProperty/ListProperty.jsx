@@ -17,7 +17,6 @@ import LocationForm from './steps/LocationForm';
 import AmenitiesForm from './steps/AmenitiesForm';
 import RoomForm from './steps/RoomForm';
 import PhotosForm from './steps/PhotosForm';
-import PricingForm from './steps/PricingForm';
 import RulesForm from './steps/RulesForm';
 
 const steps = [
@@ -26,7 +25,6 @@ const steps = [
   'Amenities',
   'Rooms',
   'Photos',
-  'Pricing',
   'Rules & Policies'
 ];
 
@@ -39,7 +37,7 @@ const ListProperty = () => {
       name: '',
       description: '',
       propertyType: '',
-      guests: '',
+      guests: '0',
       bedrooms: '',
       beds: '',
       bathrooms: ''
@@ -52,12 +50,16 @@ const ListProperty = () => {
       postalCode: '',
       coordinates: null
     },
-    amenities: [],
+    amenities: {
+      general: [],
+      room: [],
+      bathroom: [],
+      kitchen: [],
+      outdoor: [],
+      accessibility: []
+    },
     rooms: [],
     photos: [],
-    pricing: {
-      price: ''
-    },
     rules: {
       checkInTime: null,
       checkOutTime: null,
@@ -76,24 +78,39 @@ const ListProperty = () => {
 
   const handleSubmit = async () => {
     try {
-      // Check if we have coordinates
       if (!formData.location.coordinates) {
-        throw new Error('Location coordinates are missing. Please select a valid address.');
+        throw new Error('Location coordinates are missing');
       }
+
+      const totalGuests = formData.rooms.reduce((sum, room) => {
+        return sum + room.beds.reduce((bedSum, bed) => {
+          const occupancy = {
+            'Single Bed': 1,
+            'Double Bed': 2,
+            'Queen Bed': 2,
+            'King Bed': 2,
+            'Sofa Bed': 1,
+            'Bunk Bed': 2
+          };
+          return bedSum + (occupancy[bed.type] || 0) * (bed.count || 1);
+        }, 0);
+      }, 0);
 
       const propertyData = {
         ...formData,
-        location: {
-          ...formData.location,
-          latitude: formData.location.coordinates.lat,
-          longitude: formData.location.coordinates.lng
+        basicInfo: {
+          ...formData.basicInfo,
+          guests: totalGuests.toString()
         }
       };
 
       const response = await api.post('/properties', propertyData);
       
-      if (response.status === 201) {
-        navigate(`/properties/${response.data.data.id}`);
+      if (response.status === 201 && response.data.data.id) {
+        console.log('Property created successfully:', response.data);
+        navigate(`/admin/properties`);
+      } else {
+        throw new Error('Failed to create property - no ID returned');
       }
     } catch (error) {
       console.error('Error creating property:', error);
@@ -127,8 +144,31 @@ const ListProperty = () => {
       case 3:
         return (
           <RoomForm
-            rooms={formData.rooms}
-            onChange={(rooms) => setFormData(prev => ({ ...prev, rooms }))}
+            data={formData.rooms}
+            onChange={(data) => {
+              const totalGuests = data.reduce((sum, room) => {
+                return sum + room.beds.reduce((bedSum, bed) => {
+                  const occupancy = {
+                    'Single Bed': 1,
+                    'Double Bed': 2,
+                    'Queen Bed': 2,
+                    'King Bed': 2,
+                    'Sofa Bed': 1,
+                    'Bunk Bed': 2
+                  };
+                  return bedSum + (occupancy[bed.type] || 0) * (bed.count || 1);
+                }, 0);
+              }, 0);
+              
+              setFormData(prev => ({
+                ...prev,
+                rooms: data,
+                basicInfo: {
+                  ...prev.basicInfo,
+                  guests: totalGuests.toString()
+                }
+              }));
+            }}
           />
         );
       case 4:
@@ -139,13 +179,6 @@ const ListProperty = () => {
           />
         );
       case 5:
-        return (
-          <PricingForm
-            data={formData.pricing}
-            onChange={(data) => setFormData(prev => ({ ...prev, pricing: data }))}
-          />
-        );
-      case 6:
         return (
           <RulesForm
             data={formData.rules}

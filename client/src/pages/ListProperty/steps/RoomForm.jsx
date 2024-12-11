@@ -1,29 +1,30 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Box,
   Button,
+  Card,
+  CardContent,
+  Grid,
+  IconButton,
   TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  Typography,
+  MenuItem,
+  Divider,
   List,
   ListItem,
   ListItemText,
-  IconButton,
-  MenuItem,
-  Typography,
+  ListItemSecondaryAction
 } from '@mui/material';
-import { Add as AddIcon, Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
 
 const roomTypes = [
   'Single Room',
   'Double Room',
-  'Twin Room',
   'Suite',
+  'Deluxe Room',
   'Studio',
-  'Apartment',
-  'Villa',
+  'Apartment'
 ];
 
 const bedTypes = [
@@ -31,198 +32,289 @@ const bedTypes = [
   'Double Bed',
   'Queen Bed',
   'King Bed',
-  'Twin Beds',
   'Sofa Bed',
+  'Bunk Bed'
 ];
 
-const RoomForm = ({ rooms = [], onChange }) => {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingIndex, setEditingIndex] = useState(null);
-  const [currentRoom, setCurrentRoom] = useState({
-    name: '',
-    type: '',
-    bedType: '',
-    maxOccupancy: '',
-    basePrice: '',
-    description: '',
-  });
-
-  const handleOpenDialog = (index) => {
-    if (index !== undefined) {
-      setCurrentRoom(rooms[index]);
-      setEditingIndex(index);
-    } else {
-      setCurrentRoom({
+const RoomForm = ({ data = [], onChange }) => {
+  const handleAddRoom = () => {
+    onChange([
+      ...data,
+      {
         name: '',
         type: '',
-        bedType: '',
-        maxOccupancy: '',
+        beds: [],
+        maxOccupancy: 1,
         basePrice: '',
-        description: '',
-      });
-      setEditingIndex(null);
-    }
-    setIsDialogOpen(true);
+        description: ''
+      }
+    ]);
   };
 
-  const handleCloseDialog = () => {
-    setIsDialogOpen(false);
-    setEditingIndex(null);
-    setCurrentRoom({
-      name: '',
-      type: '',
-      bedType: '',
-      maxOccupancy: '',
-      basePrice: '',
-      description: '',
+  const handleAddBed = (roomIndex) => {
+    const updatedRooms = data.map((room, i) => {
+      if (i === roomIndex) {
+        return {
+          ...room,
+          beds: [
+            ...(room.beds || []),
+            { type: '', count: 1 }
+          ]
+        };
+      }
+      return room;
     });
+    onChange(updatedRooms);
   };
 
-  const handleSaveRoom = () => {
-    // Validate required fields
-    if (!currentRoom.name || !currentRoom.type || !currentRoom.bedType || !currentRoom.maxOccupancy) {
-      alert('Please fill in all required fields');
-      return;
-    }
-
-    const updatedRooms = [...rooms];
-    if (editingIndex !== null) {
-      updatedRooms[editingIndex] = currentRoom;
-    } else {
-      updatedRooms.push(currentRoom);
-    }
-    
+  const handleBedChange = (roomIndex, bedIndex, field, value) => {
+    const updatedRooms = data.map((room, i) => {
+      if (i === roomIndex) {
+        const updatedBeds = (room.beds || []).map((bed, j) => {
+          if (j === bedIndex) {
+            return { ...bed, [field]: value };
+          }
+          return bed;
+        });
+        return { ...room, beds: updatedBeds };
+      }
+      return room;
+    });
     onChange(updatedRooms);
-    handleCloseDialog();
   };
 
-  const handleDeleteRoom = (index) => {
-    const updatedRooms = rooms.filter((_, i) => i !== index);
+  const handleRemoveBed = (roomIndex, bedIndex) => {
+    const updatedRooms = data.map((room, i) => {
+      if (i === roomIndex) {
+        return {
+          ...room,
+          beds: (room.beds || []).filter((_, j) => j !== bedIndex)
+        };
+      }
+      return room;
+    });
     onChange(updatedRooms);
+  };
+
+  const handleRemoveRoom = (index) => {
+    onChange(data.filter((_, i) => i !== index));
+  };
+
+  const handleRoomChange = (index, field, value) => {
+    const updatedRooms = data.map((room, i) => {
+      if (i === index) {
+        return { ...room, [field]: value };
+      }
+      return room;
+    });
+    onChange(updatedRooms);
+  };
+
+  // Calculate total occupancy based on bed types
+  const calculateOccupancy = (beds) => {
+    return beds.reduce((total, bed) => {
+      const occupancy = {
+        'Single Bed': 1,
+        'Double Bed': 2,
+        'Queen Bed': 2,
+        'King Bed': 2,
+        'Sofa Bed': 1,
+        'Bunk Bed': 2
+      };
+      return total + (occupancy[bed.type] || 0) * bed.count;
+    }, 0);
   };
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h6">Rooms</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          Add Room
-        </Button>
-      </Box>
+      <Typography variant="h6" gutterBottom>
+        Rooms
+      </Typography>
+      
+      {data.map((room, roomIndex) => (
+        <Card key={roomIndex} sx={{ mb: 2 }}>
+          <CardContent>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Room Name"
+                  value={room.name || ''}
+                  onChange={(e) => handleRoomChange(roomIndex, 'name', e.target.value)}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  select
+                  label="Room Type"
+                  value={room.type || room.room_type || ''}
+                  onChange={(e) => handleRoomChange(roomIndex, 'type', e.target.value)}
+                >
+                  {roomTypes.map((type) => (
+                    <MenuItem key={type} value={type}>
+                      {type}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
 
-      {rooms.length === 0 ? (
-        <Typography color="text.secondary" align="center" py={4}>
-          No rooms added yet. Click "Add Room" to get started.
-        </Typography>
-      ) : (
-        <List>
-          {rooms.map((room, index) => (
-            <ListItem
-              key={index}
-              secondaryAction={
-                <Box>
-                  <IconButton edge="end" onClick={() => handleOpenDialog(index)}>
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton edge="end" onClick={() => handleDeleteRoom(index)}>
-                    <DeleteIcon />
-                  </IconButton>
-                </Box>
-              }
-            >
-              <ListItemText
-                primary={room.name}
-                secondary={`${room.type} - ${room.bedType} - Max Occupancy: ${room.maxOccupancy}`}
-              />
-            </ListItem>
-          ))}
-        </List>
-      )}
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Beds in this room
+                </Typography>
+                <List>
+                  {(room.beds || []).map((bed, bedIndex) => (
+                    <ListItem key={bedIndex}>
+                      <Grid container spacing={2} alignItems="center">
+                        <Grid item xs={6}>
+                          <TextField
+                            fullWidth
+                            select
+                            label="Bed Type"
+                            value={bed.type || ''}
+                            onChange={(e) => handleBedChange(roomIndex, bedIndex, 'type', e.target.value)}
+                          >
+                            {bedTypes.map((type) => (
+                              <MenuItem key={type} value={type}>
+                                {type}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                        </Grid>
+                        <Grid item xs={4}>
+                          <TextField
+                            fullWidth
+                            type="number"
+                            label="Count"
+                            value={bed.count || 1}
+                            onChange={(e) => handleBedChange(roomIndex, bedIndex, 'count', parseInt(e.target.value) || 1)}
+                            InputProps={{ inputProps: { min: 1 } }}
+                          />
+                        </Grid>
+                        <Grid item xs={2}>
+                          <IconButton 
+                            color="error" 
+                            onClick={() => handleRemoveBed(roomIndex, bedIndex)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Grid>
+                      </Grid>
+                    </ListItem>
+                  ))}
+                </List>
+                <Button
+                  startIcon={<AddIcon />}
+                  onClick={() => handleAddBed(roomIndex)}
+                  sx={{ mt: 1 }}
+                >
+                  Add Bed
+                </Button>
+              </Grid>
 
-      <Dialog open={isDialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingIndex !== null ? 'Edit Room' : 'Add New Room'}</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2 }}>
-            <TextField
-              fullWidth
-              label="Room Name"
-              value={currentRoom.name}
-              onChange={(e) => setCurrentRoom({ ...currentRoom, name: e.target.value })}
-              margin="normal"
-              required
-            />
-            <TextField
-              fullWidth
-              select
-              label="Room Type"
-              value={currentRoom.type}
-              onChange={(e) => setCurrentRoom({ ...currentRoom, type: e.target.value })}
-              margin="normal"
-              required
-            >
-              {roomTypes.map((type) => (
-                <MenuItem key={type} value={type}>
-                  {type}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              fullWidth
-              select
-              label="Bed Type"
-              value={currentRoom.bedType}
-              onChange={(e) => setCurrentRoom({ ...currentRoom, bedType: e.target.value })}
-              margin="normal"
-              required
-            >
-              {bedTypes.map((type) => (
-                <MenuItem key={type} value={type}>
-                  {type}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              fullWidth
-              label="Maximum Occupancy"
-              type="number"
-              value={currentRoom.maxOccupancy}
-              onChange={(e) => setCurrentRoom({ ...currentRoom, maxOccupancy: e.target.value })}
-              margin="normal"
-              required
-              InputProps={{ inputProps: { min: 1 } }}
-            />
-            <TextField
-              fullWidth
-              label="Base Price per Night"
-              type="number"
-              value={currentRoom.basePrice}
-              onChange={(e) => setCurrentRoom({ ...currentRoom, basePrice: e.target.value })}
-              margin="normal"
-              required
-              InputProps={{ inputProps: { min: 0 } }}
-            />
-            <TextField
-              fullWidth
-              label="Room Description"
-              value={currentRoom.description}
-              onChange={(e) => setCurrentRoom({ ...currentRoom, description: e.target.value })}
-              margin="normal"
-              multiline
-              rows={4}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSaveRoom} variant="contained">
-            Save Room
-          </Button>
-        </DialogActions>
-      </Dialog>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Maximum Occupancy"
+                  value={calculateOccupancy(room.beds || [])}
+                  disabled
+                  helperText="Calculated based on bed types"
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Room Pricing
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Base Price per Night"
+                      value={room.basePrice || room.base_price || ''}
+                      onChange={(e) => handleRoomChange(roomIndex, 'basePrice', e.target.value)}
+                      InputProps={{ inputProps: { min: 0 } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Cleaning Fee"
+                      value={room.cleaningFee || room.cleaning_fee || ''}
+                      onChange={(e) => handleRoomChange(roomIndex, 'cleaningFee', e.target.value)}
+                      InputProps={{ inputProps: { min: 0 } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Service Fee"
+                      value={room.serviceFee || room.service_fee || ''}
+                      onChange={(e) => handleRoomChange(roomIndex, 'serviceFee', e.target.value)}
+                      InputProps={{ inputProps: { min: 0 } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Tax Rate (%)"
+                      value={room.taxRate || room.tax_rate || ''}
+                      onChange={(e) => handleRoomChange(roomIndex, 'taxRate', e.target.value)}
+                      InputProps={{ inputProps: { min: 0, max: 100 } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Security Deposit"
+                      value={room.securityDeposit || room.security_deposit || ''}
+                      onChange={(e) => handleRoomChange(roomIndex, 'securityDeposit', e.target.value)}
+                      InputProps={{ inputProps: { min: 0 } }}
+                    />
+                  </Grid>
+                </Grid>
+              </Grid>
+
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label="Room Description"
+                  value={room.description}
+                  onChange={(e) => handleRoomChange(roomIndex, 'description', e.target.value)}
+                />
+              </Grid>
+
+              <Grid item xs={12} sx={{ textAlign: 'right' }}>
+                <IconButton 
+                  color="error" 
+                  onClick={() => handleRemoveRoom(roomIndex)}
+                >
+                  <DeleteIcon />
+                </IconButton>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      ))}
+
+      <Button
+        startIcon={<AddIcon />}
+        variant="outlined"
+        onClick={handleAddRoom}
+        sx={{ mt: 2 }}
+      >
+        Add Room
+      </Button>
     </Box>
   );
 };

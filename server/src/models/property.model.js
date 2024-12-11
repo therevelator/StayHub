@@ -16,11 +16,6 @@ const createPropertiesTable = async () => {
       state VARCHAR(255),
       country VARCHAR(255) NOT NULL,
       postal_code VARCHAR(20),
-      base_price DECIMAL(10, 2) NOT NULL,
-      cleaning_fee DECIMAL(10, 2),
-      service_fee DECIMAL(10, 2),
-      tax_rate DECIMAL(5, 2),
-      security_deposit DECIMAL(10, 2),
       star_rating DECIMAL(2, 1),
       host_id VARCHAR(36) NOT NULL,
       guests INT NOT NULL,
@@ -71,9 +66,13 @@ const createPropertiesTable = async () => {
       property_id INT,
       name VARCHAR(255) NOT NULL,
       room_type VARCHAR(50),
-      bed_type VARCHAR(50),
+      beds JSON,
       max_occupancy INT,
       base_price DECIMAL(10, 2),
+      cleaning_fee DECIMAL(10, 2),
+      service_fee DECIMAL(10, 2),
+      tax_rate DECIMAL(5, 2),
+      security_deposit DECIMAL(10, 2),
       description TEXT,
       FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE
     )`
@@ -85,7 +84,7 @@ const createPropertiesTable = async () => {
 };
 
 // Find properties within radius using Haversine formula
-const findPropertiesInRadius = async (lat, lon, radius) => {
+const findPropertiesInRadius = async (lat, lon, radius, guests) => {
   const query = `
     SELECT 
       p.*,
@@ -96,6 +95,24 @@ const findPropertiesInRadius = async (lat, lon, radius) => {
         LIMIT 1
       ) as imageUrl,
       (
+        SELECT JSON_ARRAYAGG(
+          JSON_OBJECT(
+            'id', r.id,
+            'name', r.name,
+            'type', r.room_type,
+            'beds', r.beds,
+            'maxOccupancy', r.max_occupancy,
+            'basePrice', r.base_price,
+            'cleaningFee', r.cleaning_fee,
+            'serviceFee', r.service_fee,
+            'taxRate', r.tax_rate,
+            'securityDeposit', r.security_deposit
+          )
+        )
+        FROM rooms r
+        WHERE r.property_id = p.id AND r.max_occupancy >= ?
+      ) as rooms,
+      (
         6371 * acos(
           cos(radians(?)) * 
           cos(radians(latitude)) * 
@@ -105,20 +122,33 @@ const findPropertiesInRadius = async (lat, lon, radius) => {
         )
       ) AS distance
     FROM properties p
-    HAVING distance <= ?
+    HAVING distance <= ? AND JSON_LENGTH(rooms) > 0
     ORDER BY distance;
   `;
 
   try {
-    console.log('Executing search query with params:', { lat, lon, radius: radius/1000 });
-    const [rows] = await db.query(query, [lat, lon, lat, radius/1000]);
+    console.log('Executing search query with params:', { lat, lon, radius: radius/1000, guests });
+    const [rows] = await db.query(query, [guests, lat, lon, lat, radius/1000]);
     console.log(`Found ${rows.length} properties within ${radius/1000}km radius`);
     
-    return rows.map(property => ({
-      ...property,
-      distance: Math.round(property.distance * 10) / 10, // Round to 1 decimal place
-      price: parseFloat(property.price)
-    }));
+    return rows.map(property => {
+      // Parse rooms if it's a string, otherwise use as is
+      const rooms = typeof property.rooms === 'string' 
+        ? JSON.parse(property.rooms)
+        : property.rooms;
+
+      // For each room, parse the beds field if it's a string
+      const processedRooms = rooms?.map(room => ({
+        ...room,
+        beds: typeof room.beds === 'string' ? JSON.parse(room.beds) : room.beds
+      })) || [];
+
+      return {
+        ...property,
+        distance: Math.round(property.distance * 10) / 10, // Round to 1 decimal place
+        rooms: processedRooms
+      };
+    });
   } catch (error) {
     console.error('Error in findPropertiesInRadius:', error);
     throw error;
@@ -172,6 +202,25 @@ const getPropertyById = async (id) => {
   const query = `
     SELECT 
       p.*,
+      (
+        SELECT JSON_ARRAYAGG(
+          JSON_OBJECT(
+            'id', r.id,
+            'name', r.name,
+            'type', r.room_type,
+            'beds', r.beds,
+            'maxOccupancy', r.max_occupancy,
+            'basePrice', r.base_price,
+            'cleaningFee', r.cleaning_fee,
+            'serviceFee', r.service_fee,
+            'taxRate', r.tax_rate,
+            'securityDeposit', r.security_deposit,
+            'description', r.description
+          )
+        )
+        FROM rooms r
+        WHERE r.property_id = p.id
+      ) as rooms,
       (
         SELECT JSON_ARRAYAGG(
           JSON_OBJECT(
@@ -240,6 +289,20 @@ const getPropertyById = async (id) => {
       });
     }
 
+    // Transform room data to match form structure
+    const rooms = safeJSONParse(property.rooms).map(room => ({
+      name: room.name,
+      type: room.type || room.room_type, // Handle both formats
+      beds: safeJSONParse(room.beds),
+      maxOccupancy: room.maxOccupancy || room.max_occupancy,
+      basePrice: room.basePrice || room.base_price,
+      cleaningFee: room.cleaningFee || room.cleaning_fee,
+      serviceFee: room.serviceFee || room.service_fee,
+      taxRate: room.taxRate || room.tax_rate,
+      securityDeposit: room.securityDeposit || room.security_deposit,
+      description: room.description
+    }));
+
     return {
       basicInfo: {
         name: property.name || '',
@@ -262,17 +325,11 @@ const getPropertyById = async (id) => {
         }
       },
       amenities: amenitiesByCategory,
+      rooms: rooms,
       photos: safeJSONParse(property.images),
-      pricing: {
-        price: property.base_price?.toString() || '',
-        cleaningFee: property.cleaning_fee?.toString() || '',
-        serviceFee: property.service_fee?.toString() || '',
-        taxRate: property.tax_rate?.toString() || '',
-        securityDeposit: property.security_deposit?.toString() || ''
-      },
       rules: {
-        checkInTime: property.check_in_time || null,
-        checkOutTime: property.check_out_time || null,
+        checkInTime: property.check_in_time ? dayjs(`2024-01-01T${property.check_in_time}`) : null,
+        checkOutTime: property.check_out_time ? dayjs(`2024-01-01T${property.check_out_time}`) : null,
         cancellationPolicy: property.cancellation_policy || '',
         houseRules: safeJSONParse(property.house_rules),
         petPolicy: property.pet_policy || '',
@@ -289,34 +346,14 @@ const getPropertyById = async (id) => {
 const createProperty = async (propertyData) => {
   console.log('Creating property with data:', propertyData);
   
+  // Extract data from the nested form structure
   const {
-    name,
-    description,
-    latitude,
-    longitude,
-    street,
-    city,
-    state,
-    country,
-    postal_code,
-    base_price,
-    cleaning_fee = null,
-    service_fee = null,
-    tax_rate = null,
-    security_deposit = null,
-    host_id,
-    guests,
-    bedrooms,
-    beds,
-    bathrooms,
-    property_type,
-    check_in_time = null,
-    check_out_time = null,
-    cancellation_policy = null,
-    pet_policy = null,
-    event_policy = null,
-    star_rating = null,
-    languages_spoken = null
+    basicInfo,
+    location,
+    rules,
+    rooms,
+    photos,
+    amenities
   } = propertyData;
 
   const connection = await db.getConnection();
@@ -328,49 +365,107 @@ const createProperty = async (propertyData) => {
     const [propertyResult] = await connection.query(
       `INSERT INTO properties (
         name, description, latitude, longitude, street, city, state, country,
-        postal_code, base_price, cleaning_fee, service_fee, tax_rate, 
-        security_deposit, host_id, guests, bedrooms, beds, bathrooms,
+        postal_code, host_id, guests, bedrooms, beds, bathrooms,
         property_type, check_in_time, check_out_time, cancellation_policy,
         pet_policy, event_policy, star_rating, languages_spoken
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        name,
-        description,
-        latitude,
-        longitude,
-        street,
-        city,
-        state || null,
-        country,
-        postal_code || null,
-        parseFloat(base_price) || 0,
-        cleaning_fee ? parseFloat(cleaning_fee) : null,
-        service_fee ? parseFloat(service_fee) : null,
-        tax_rate ? parseFloat(tax_rate) : null,
-        security_deposit ? parseFloat(security_deposit) : null,
-        host_id,
-        parseInt(guests) || 4,
-        parseInt(bedrooms) || 1,
-        parseInt(beds) || 1,
-        parseInt(bathrooms) || 1,
-        property_type,
-        check_in_time || null,
-        check_out_time || null,
-        cancellation_policy || null,
-        pet_policy || null,
-        event_policy || null,
-        star_rating ? parseFloat(star_rating) : null,
-        languages_spoken ? JSON.stringify(languages_spoken) : null
+        basicInfo.name,
+        basicInfo.description,
+        location.coordinates.lat,
+        location.coordinates.lng,
+        location.street,
+        location.city,
+        location.state,
+        location.country,
+        location.postalCode,
+        propertyData.host_id,
+        parseInt(basicInfo.guests) || 4,
+        parseInt(basicInfo.bedrooms) || 1,
+        parseInt(basicInfo.beds) || 1,
+        parseInt(basicInfo.bathrooms) || 1,
+        basicInfo.propertyType,
+        formatTime(rules.checkInTime),
+        formatTime(rules.checkOutTime),
+        rules.cancellationPolicy,
+        rules.petPolicy,
+        rules.eventPolicy,
+        null, // star_rating
+        null  // languages_spoken
       ]
     );
 
     const propertyId = propertyResult.insertId;
-    await connection.commit();
 
-    // Get and return the created property
-    const property = await getPropertyById(propertyId);
-    console.log('Successfully created property:', property);
-    return property;
+    // Insert rooms
+    if (rooms?.length > 0) {
+      const roomValues = rooms.map(room => [
+        propertyId,
+        room.name,
+        room.type,
+        JSON.stringify(room.beds),
+        calculateOccupancy(room.beds),
+        parseFloat(room.basePrice) || 0,
+        parseFloat(room.cleaningFee) || null,
+        parseFloat(room.serviceFee) || null,
+        parseFloat(room.taxRate) || null,
+        parseFloat(room.securityDeposit) || null,
+        room.description
+      ]);
+
+      await connection.query(
+        `INSERT INTO rooms 
+        (property_id, name, room_type, beds, max_occupancy, base_price, cleaning_fee, service_fee, tax_rate, security_deposit, description) 
+        VALUES ?`,
+        [roomValues]
+      );
+    }
+
+    // Insert amenities
+    const amenityValues = [];
+    Object.entries(amenities).forEach(([category, amenityList]) => {
+      amenityList.forEach(amenity => {
+        amenityValues.push([propertyId, amenity, category]);
+      });
+    });
+    if (amenityValues.length > 0) {
+      await connection.query(
+        'INSERT INTO property_amenities (property_id, amenity, category) VALUES ?',
+        [amenityValues]
+      );
+    }
+
+    // Insert house rules
+    if (rules.houseRules?.length > 0) {
+      const ruleValues = rules.houseRules.map(rule => [propertyId, rule]);
+      await connection.query(
+        'INSERT INTO property_rules (property_id, rule) VALUES ?',
+        [ruleValues]
+      );
+    }
+
+    // Insert images
+    if (photos?.length > 0) {
+      const imageValues = photos.map(photo => [
+        propertyId,
+        photo.url,
+        photo.caption || null
+      ]);
+      await connection.query(
+        'INSERT INTO property_images (property_id, url, caption) VALUES ?',
+        [imageValues]
+      );
+    }
+
+    await connection.commit();
+    // Return the basic property data including the ID
+    return {
+      id: propertyId,
+      ...propertyData,
+      // Add any other necessary fields
+      created_at: new Date(),
+      updated_at: new Date()
+    };
 
   } catch (error) {
     console.error('Error in createProperty:', error);
@@ -381,6 +476,13 @@ const createProperty = async (propertyData) => {
   }
 };
 
+// Helper function to format time
+const formatTime = (timeStr) => {
+  if (!timeStr) return null;
+  const date = new Date(timeStr);
+  return date.toTimeString().split(' ')[0];
+};
+
 // Update a property
 const updateProperty = async (propertyId, propertyData) => {
   const connection = await db.getConnection();
@@ -388,7 +490,14 @@ const updateProperty = async (propertyId, propertyData) => {
   try {
     await connection.beginTransaction();
 
-    // Update main property data
+    // Format time values
+    const formatTime = (timeStr) => {
+      if (!timeStr) return null;
+      const date = new Date(timeStr);
+      return date.toTimeString().split(' ')[0];
+    };
+
+    // Update main property data (removed pricing fields)
     await connection.query(
       `UPDATE properties SET
         name = ?,
@@ -405,11 +514,6 @@ const updateProperty = async (propertyId, propertyData) => {
         postal_code = ?,
         latitude = ?,
         longitude = ?,
-        base_price = ?,
-        cleaning_fee = ?,
-        service_fee = ?,
-        tax_rate = ?,
-        security_deposit = ?,
         check_in_time = ?,
         check_out_time = ?,
         cancellation_policy = ?,
@@ -431,19 +535,59 @@ const updateProperty = async (propertyId, propertyData) => {
         propertyData.location.postalCode,
         propertyData.location.coordinates.lat,
         propertyData.location.coordinates.lng,
-        parseFloat(propertyData.pricing.price),
-        parseFloat(propertyData.pricing.cleaningFee) || null,
-        parseFloat(propertyData.pricing.serviceFee) || null,
-        parseFloat(propertyData.pricing.taxRate) || null,
-        parseFloat(propertyData.pricing.securityDeposit) || null,
-        propertyData.rules.checkInTime,
-        propertyData.rules.checkOutTime,
+        formatTime(propertyData.rules.checkInTime),
+        formatTime(propertyData.rules.checkOutTime),
         propertyData.rules.cancellationPolicy,
         propertyData.rules.petPolicy,
         propertyData.rules.eventPolicy,
         propertyId
       ]
     );
+
+    // Update rooms
+    await connection.query('DELETE FROM rooms WHERE property_id = ?', [propertyId]);
+    if (propertyData.rooms?.length > 0) {
+      const roomValues = propertyData.rooms.map(room => {
+        // Ensure all numeric values are properly parsed with fallbacks
+        const basePrice = parseFloat(room.basePrice || room.base_price) || 0;
+        const cleaningFee = parseFloat(room.cleaningFee || room.cleaning_fee) || null;
+        const serviceFee = parseFloat(room.serviceFee || room.service_fee) || null;
+        const taxRate = parseFloat(room.taxRate || room.tax_rate) || null;
+        const securityDeposit = parseFloat(room.securityDeposit || room.security_deposit) || null;
+        const roomType = room.type || room.room_type || 'Standard Room'; // Add default room type
+
+        console.log('Processing room:', {
+          name: room.name,
+          type: roomType,
+          basePrice,
+          cleaningFee,
+          serviceFee,
+          taxRate,
+          securityDeposit
+        });
+
+        return [
+          propertyId,
+          room.name,
+          roomType,  // Use the processed room type
+          JSON.stringify(room.beds),
+          calculateOccupancy(room.beds),
+          basePrice,
+          cleaningFee,
+          serviceFee,
+          taxRate,
+          securityDeposit,
+          room.description
+        ];
+      });
+
+      await connection.query(
+        `INSERT INTO rooms 
+        (property_id, name, room_type, beds, max_occupancy, base_price, cleaning_fee, service_fee, tax_rate, security_deposit, description) 
+        VALUES ?`,
+        [roomValues]
+      );
+    }
 
     // Update amenities
     await connection.query('DELETE FROM property_amenities WHERE property_id = ?', [propertyId]);
@@ -494,6 +638,22 @@ const updateProperty = async (propertyId, propertyData) => {
   } finally {
     connection.release();
   }
+};
+
+// Helper function to calculate occupancy
+const calculateOccupancy = (beds) => {
+  const occupancy = {
+    'Single Bed': 1,
+    'Double Bed': 2,
+    'Queen Bed': 2,
+    'King Bed': 2,
+    'Sofa Bed': 1,
+    'Bunk Bed': 2
+  };
+
+  return beds.reduce((total, bed) => {
+    return total + (occupancy[bed.type] || 0) * (bed.count || 1);
+  }, 0);
 };
 
 const deleteProperty = async (propertyId) => {

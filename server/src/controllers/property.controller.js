@@ -43,9 +43,9 @@ const getCoordinates = async (address) => {
 
 const searchProperties = async (req, res) => {
   try {
-    console.log('Search request:', req.query); // Log the query params
+    console.log('Search request:', req.query);
 
-    const { lat, lon, radius = 25, checkIn, checkOut, guests } = req.query;
+    const { lat, lon, radius = 25, guests } = req.query;
     
     if (!lat || !lon) {
       return res.status(400).json({ 
@@ -67,8 +67,11 @@ const searchProperties = async (req, res) => {
     const properties = await findPropertiesInRadius(
       searchParams.lat,
       searchParams.lon,
-      searchParams.radius
+      searchParams.radius,
+      searchParams.guests
     );
+
+    console.log(`Found ${properties.length} properties`);
 
     res.json({
       status: 'success',
@@ -87,6 +90,13 @@ const searchProperties = async (req, res) => {
 const getPropertyDetailsById = async (req, res) => {
   try {
     console.log('Getting property details for ID:', req.params.id);
+    if (!req.params.id) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Property ID is required'
+      });
+    }
+
     const { id } = req.params;
     
     console.log('Fetching property from database...');
@@ -128,16 +138,23 @@ const getPropertyDetailsById = async (req, res) => {
 
 const createNewProperty = async (req, res) => {
   try {
-    const hostId = req.user.id; // From auth middleware
     const propertyData = {
       ...req.body,
-      host_id: hostId
+      host_id: req.user.userId
     };
 
     const newProperty = await createProperty(propertyData);
+    console.log('New property created:', newProperty);
+
     res.status(201).json({
       status: 'success',
-      data: newProperty
+      data: {
+        id: newProperty.id,
+        name: newProperty.basicInfo.name,
+        description: newProperty.basicInfo.description,
+        created_at: newProperty.created_at,
+        updated_at: newProperty.updated_at
+      }
     });
   } catch (error) {
     console.error('Error creating property:', error);
@@ -222,15 +239,33 @@ export const getAllProperties = async (req, res) => {
           FROM property_images pi 
           WHERE pi.property_id = p.id 
           LIMIT 1
-        ) as imageUrl
+        ) as imageUrl,
+        (
+          SELECT JSON_ARRAYAGG(
+            JSON_OBJECT(
+              'id', r.id,
+              'name', r.name,
+              'type', r.room_type,
+              'beds', r.beds,
+              'maxOccupancy', r.max_occupancy,
+              'basePrice', r.base_price,
+              'cleaningFee', r.cleaning_fee,
+              'serviceFee', r.service_fee,
+              'taxRate', r.tax_rate,
+              'securityDeposit', r.security_deposit
+            )
+          )
+          FROM rooms r
+          WHERE r.property_id = p.id
+        ) as rooms
       FROM properties p
       LEFT JOIN users u ON p.host_id COLLATE utf8mb4_unicode_ci = u.id COLLATE utf8mb4_unicode_ci
     `;
 
     let queryParams = [];
 
-    // Add user filtering only if user exists and is not admin
-    if (req.user && !req.user.isAdmin) {
+    // Add user filtering only if user exists and is NOT admin
+    if (req.user && req.user.role !== 'admin') {
       query += ' WHERE p.host_id COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci';
       queryParams.push(req.user.userId);
     }
@@ -248,16 +283,25 @@ export const getAllProperties = async (req, res) => {
     
     console.log(`Found ${properties.length} properties`);
     
-    // Transform price fields to match the expected format
-    const formattedProperties = properties.map(property => ({
-      ...property,
-      price: property.base_price, // Use base_price as price
-      base_price: parseFloat(property.base_price),
-      cleaning_fee: parseFloat(property.cleaning_fee),
-      service_fee: parseFloat(property.service_fee),
-      tax_rate: parseFloat(property.tax_rate),
-      security_deposit: parseFloat(property.security_deposit)
-    }));
+    // Transform the properties to include room data
+    const formattedProperties = properties.map(property => {
+      // Parse rooms if it's a string, otherwise use as is
+      const rooms = typeof property.rooms === 'string' 
+        ? JSON.parse(property.rooms)
+        : property.rooms;
+
+      // Get the lowest room price
+      const lowestPrice = rooms?.reduce((min, room) => {
+        const price = parseFloat(room.basePrice || room.base_price);
+        return price < min ? price : min;
+      }, Infinity) || 0;
+
+      return {
+        ...property,
+        rooms: rooms || [],
+        price: lowestPrice // Use lowest room price as property price
+      };
+    });
 
     res.json({
       status: 'success',
