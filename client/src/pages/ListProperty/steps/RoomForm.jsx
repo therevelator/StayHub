@@ -13,7 +13,8 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction
+  ListItemSecondaryAction,
+  Paper
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -125,6 +126,17 @@ const RoomForm = ({ data = [], onChange }) => {
     }, 0);
   };
 
+  const calculateTotalPrice = (room) => {
+    const basePrice = Number(room.basePrice || room.base_price || 0);
+    const cleaningFee = Number(room.cleaningFee || room.cleaning_fee || 0);
+    const serviceFee = Number(room.serviceFee || room.service_fee || 0);
+    const taxRate = Number(room.taxRate || room.tax_rate || 0);
+
+    const subtotal = basePrice + cleaningFee + serviceFee;
+    const taxAmount = subtotal * taxRate / 100;
+    return subtotal + taxAmount;
+  };
+
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
@@ -132,7 +144,7 @@ const RoomForm = ({ data = [], onChange }) => {
       </Typography>
       
       {data.map((room, roomIndex) => (
-        <Card key={roomIndex} sx={{ mb: 2 }}>
+        <Paper key={roomIndex} sx={{ p: 3, mb: 3 }}>
           <CardContent>
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
@@ -231,14 +243,19 @@ const RoomForm = ({ data = [], onChange }) => {
                 </Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="Base Price per Night"
-                      value={room.basePrice || room.base_price || ''}
-                      onChange={(e) => handleRoomChange(roomIndex, 'basePrice', e.target.value)}
-                      InputProps={{ inputProps: { min: 0 } }}
-                    />
+                    <Box>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Base Price per Night"
+                        value={room.basePrice || room.base_price || ''}
+                        onChange={(e) => handleRoomChange(roomIndex, 'basePrice', e.target.value)}
+                        InputProps={{ inputProps: { min: 0 } }}
+                      />
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                        Total with fees: ${calculateTotalPrice(room).toFixed(2)}
+                      </Typography>
+                    </Box>
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <TextField
@@ -270,16 +287,6 @@ const RoomForm = ({ data = [], onChange }) => {
                       InputProps={{ inputProps: { min: 0, max: 100 } }}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="Security Deposit"
-                      value={room.securityDeposit || room.security_deposit || ''}
-                      onChange={(e) => handleRoomChange(roomIndex, 'securityDeposit', e.target.value)}
-                      InputProps={{ inputProps: { min: 0 } }}
-                    />
-                  </Grid>
                 </Grid>
               </Grid>
 
@@ -304,7 +311,7 @@ const RoomForm = ({ data = [], onChange }) => {
               </Grid>
             </Grid>
           </CardContent>
-        </Card>
+        </Paper>
       ))}
 
       <Button

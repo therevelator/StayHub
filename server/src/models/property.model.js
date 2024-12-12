@@ -99,59 +99,46 @@ const findPropertiesInRadius = async (lat, lon, radius, guests, propertyType) =>
           JSON_OBJECT(
             'id', r.id,
             'name', r.name,
-            'type', r.room_type,
+            'room_type', r.room_type,
+            'bed_type', r.bed_type,
             'beds', r.beds,
-            'maxOccupancy', r.max_occupancy,
-            'basePrice', r.base_price,
-            'cleaningFee', r.cleaning_fee,
-            'serviceFee', r.service_fee,
-            'taxRate', r.tax_rate,
-            'securityDeposit', r.security_deposit
+            'max_occupancy', r.max_occupancy,
+            'base_price', r.base_price,
+            'cleaning_fee', r.cleaning_fee,
+            'service_fee', r.service_fee,
+            'tax_rate', r.tax_rate
           )
         )
         FROM rooms r
-        WHERE r.property_id = p.id AND r.max_occupancy >= ?
+        WHERE r.property_id = p.id
       ) as rooms,
-      (
-        6371 * acos(
-          cos(radians(?)) * 
-          cos(radians(latitude)) * 
-          cos(radians(longitude) - radians(?)) + 
-          sin(radians(?)) * 
-          sin(radians(latitude))
-        )
-      ) AS distance
+      ST_Distance_Sphere(
+        point(p.longitude, p.latitude),
+        point(?, ?)
+      ) / 1000 as distance
     FROM properties p
-    ${propertyType ? 'WHERE LOWER(p.property_type) = LOWER(?)' : ''}
-    HAVING distance <= ? AND JSON_LENGTH(rooms) > 0
+    HAVING distance <= ?
     ORDER BY distance;
   `;
 
   try {
     console.log('Executing search query with params:', { lat, lon, radius: radius/1000, guests, propertyType });
-    const queryParams = propertyType 
-      ? [guests, lat, lon, lat, propertyType, radius/1000]
-      : [guests, lat, lon, lat, radius/1000];
+    const queryParams = [lon, lat, radius/1000];
     console.log('Query params:', queryParams);
+    
     const [rows] = await db.query(query, queryParams);
     console.log(`Found ${rows.length} properties within ${radius/1000}km radius`);
     
     return rows.map(property => {
-      // Parse rooms if it's a string, otherwise use as is
+      // Parse rooms if it's a string
       const rooms = typeof property.rooms === 'string' 
         ? JSON.parse(property.rooms)
         : property.rooms;
 
-      // For each room, parse the beds field if it's a string
-      const processedRooms = rooms?.map(room => ({
-        ...room,
-        beds: typeof room.beds === 'string' ? JSON.parse(room.beds) : room.beds
-      })) || [];
-
       return {
         ...property,
         distance: Math.round(property.distance * 10) / 10, // Round to 1 decimal place
-        rooms: processedRooms
+        rooms: rooms || []
       };
     });
   } catch (error) {

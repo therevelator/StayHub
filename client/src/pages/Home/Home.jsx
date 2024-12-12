@@ -96,37 +96,81 @@ const Home = () => {
               Properties near {searchResults.searchParams.location}
             </Typography>
             <Grid container spacing={3}>
-              {searchResults.results.map((property) => (
-                <Grid item key={property.id} xs={12} sm={6} md={4}>
-                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <CardMedia
-                      component="img"
-                      height="200"
-                      image={property.imageUrl || 'default-property-image.jpg'}
-                      alt={property.name}
-                    />
-                    <CardContent sx={{ flexGrow: 1 }}>
-                      <Typography variant="h5" component="h2" gutterBottom>
-                        {property.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
-                        {property.city}, {property.country}
-                      </Typography>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-                        <Typography variant="h6" color="primary">
-                          ${property.price} / night
+              {searchResults.results.map((property) => {
+                console.log('Property:', property);
+                console.log('Rooms:', property.rooms);
+
+                // Calculate total price for each room and find the cheapest
+                const calculateRoomTotalPrice = (room) => {
+                  const basePrice = Number(room.base_price) || 0;
+                  const cleaningFee = Number(room.cleaning_fee) || 0;
+                  const serviceFee = Number(room.service_fee) || 0;
+                  const taxRate = Number(room.tax_rate) || 0;
+                  
+                  const subtotal = basePrice + cleaningFee + serviceFee;
+                  const taxAmount = subtotal * taxRate / 100;
+                  return subtotal + taxAmount;
+                };
+
+                const cheapestTotal = property.rooms?.length > 0
+                  ? Math.min(...property.rooms.map(room => calculateRoomTotalPrice(room)))
+                  : 0;
+
+                const formattedPrice = cheapestTotal ? cheapestTotal.toFixed(2) : '—';
+
+                return (
+                  <Grid item key={property.id} xs={12} sm={6} md={4}>
+                    <Card sx={{ 
+                      height: '100%', 
+                      display: 'flex', 
+                      flexDirection: 'column',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        transition: 'transform 0.2s ease-in-out',
+                        boxShadow: 3
+                      },
+                      cursor: 'pointer'
+                    }}>
+                      <CardMedia
+                        component="img"
+                        height="200"
+                        image={property.imageUrl || 'default-property-image.jpg'}
+                        alt={property.name}
+                        sx={{ objectFit: 'cover' }}
+                      />
+                      <CardContent sx={{ flexGrow: 1 }}>
+                        <Typography variant="h5" component="h2" gutterBottom>
+                          {property.name}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {property.property_type}
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          {property.city}, {property.country}
                         </Typography>
-                      </Box>
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        {property.distance ? `${property.distance}km away` : ''}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
+                        <Box sx={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center', 
+                          mt: 2 
+                        }}>
+                          <Box>
+                            <Typography variant="h6" color="primary">
+                              {formattedPrice === '—' ? 'Price unavailable' : `From $${formattedPrice} / night`}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Includes all fees
+                            </Typography>
+                          </Box>
+                          <Typography variant="body2" color="text.secondary">
+                            {property.property_type}
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                          {property.distance ? `${Number(property.distance).toFixed(1)}km away` : ''}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                );
+              })}
             </Grid>
           </Container>
         )
