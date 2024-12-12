@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import {
   Paper,
@@ -23,13 +23,20 @@ const propertyTypes = [
   'Hostel'
 ];
 
-const SearchBar = ({ onSearchResults }) => {
-  const [location, setLocation] = useState('');
+const SearchBar = ({ onSearchResults, initialLocation }) => {
+  const [location, setLocation] = useState(initialLocation || '');
   const [checkIn, setCheckIn] = useState(null);
   const [checkOut, setCheckOut] = useState(null);
   const [guests, setGuests] = useState(1);
   const [propertyType, setPropertyType] = useState('Any');
   const [loading, setLoading] = useState(false);
+
+  // Update location when initialLocation changes
+  useEffect(() => {
+    if (initialLocation) {
+      setLocation(initialLocation);
+    }
+  }, [initialLocation]);
 
   const handleSearch = async () => {
     try {
