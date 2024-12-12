@@ -7,28 +7,23 @@ import {
   Box,
   TextField,
   CircularProgress,
-  MenuItem
+  MenuItem,
+  Grid
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 
-const propertyTypes = [
-  'Any',
-  'Hotel',
-  'Apartment',
-  'Villa',
-  'Resort',
-  'Guesthouse',
-  'Hostel'
-];
-
-const SearchBar = ({ onSearchResults, initialLocation }) => {
+const SearchBar = ({ 
+  onSearchResults, 
+  initialLocation,
+  onPropertyTypeChange,
+  selectedPropertyType 
+}) => {
   const [location, setLocation] = useState(initialLocation || '');
   const [checkIn, setCheckIn] = useState(null);
   const [checkOut, setCheckOut] = useState(null);
   const [guests, setGuests] = useState(1);
-  const [propertyType, setPropertyType] = useState('Any');
   const [loading, setLoading] = useState(false);
 
   // Update location when initialLocation changes
@@ -61,7 +56,7 @@ const SearchBar = ({ onSearchResults, initialLocation }) => {
         guests: parseInt(guests) || 1,
         checkIn: checkIn ? dayjs(checkIn).format('YYYY-MM-DD') : null,
         checkOut: checkOut ? dayjs(checkOut).format('YYYY-MM-DD') : null,
-        propertyType: propertyType === 'Any' ? null : propertyType
+        propertyType: selectedPropertyType || null
       };
 
       console.log('Searching with params:', searchParams);
@@ -91,74 +86,88 @@ const SearchBar = ({ onSearchResults, initialLocation }) => {
     }
   };
 
+  const propertyTypes = [
+    { value: '', label: 'All Types' },
+    { value: 'hotel', label: 'Hotel' },
+    { value: 'apartment', label: 'Apartment' },
+    { value: 'villa', label: 'Villa' },
+    { value: 'resort', label: 'Resort' },
+    { value: 'guesthouse', label: 'Guesthouse' },
+    { value: 'hostel', label: 'Hostel' }
+  ];
+
   return (
-    <Paper
-      component="form"
-      sx={{
-        p: 2,
-        display: 'flex',
-        alignItems: 'center',
-        width: '100%',
-        maxWidth: 800,
-        margin: 'auto'
-      }}
-      elevation={3}
-    >
-      <Box sx={{ flex: 2, mr: 2 }}>
-        <InputBase
-          fullWidth
-          placeholder="Where are you going?"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          sx={{ ml: 1 }}
-        />
-      </Box>
+    <Paper elevation={3} sx={{ p: 2 }}>
+      <Grid container spacing={2} alignItems="center">
+        <Grid item xs={12} sm={3}>
+          <InputBase
+            fullWidth
+            placeholder="Where are you going?"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            sx={{ ml: 1 }}
+          />
+        </Grid>
 
-      <Box sx={{ display: 'flex', alignItems: 'center', flex: 3, gap: 2 }}>
-        <DatePicker
-          label="Check-in"
-          value={checkIn}
-          onChange={setCheckIn}
-          slotProps={{ textField: { size: 'small' } }}
-        />
-        <DatePicker
-          label="Check-out"
-          value={checkOut}
-          onChange={setCheckOut}
-          slotProps={{ textField: { size: 'small' } }}
-        />
-        <TextField
-          type="number"
-          label="Guests"
-          value={guests}
-          onChange={(e) => setGuests(parseInt(e.target.value) || 1)}
-          size="small"
-          InputProps={{ inputProps: { min: 1 } }}
-          sx={{ width: 100 }}
-        />
-        <TextField
-          select
-          label="Type"
-          value={propertyType}
-          onChange={(e) => setPropertyType(e.target.value)}
-          size="small"
-          sx={{ width: 120 }}
-        >
-          {propertyTypes.map((type) => (
-            <MenuItem key={type} value={type}>
-              {type}
-            </MenuItem>
-          ))}
-        </TextField>
-      </Box>
+        <Grid item xs={12} sm={3}>
+          <DatePicker
+            label="Check-in"
+            value={checkIn}
+            onChange={setCheckIn}
+            slotProps={{ textField: { size: 'small' } }}
+          />
+        </Grid>
 
-      <IconButton 
-        onClick={handleSearch} 
-        disabled={loading || !location}
-        sx={{ ml: 2 }}
-      >
-        {loading ? <CircularProgress size={24} /> : <SearchIcon />}
-      </IconButton>
+        <Grid item xs={12} sm={3}>
+          <DatePicker
+            label="Check-out"
+            value={checkOut}
+            onChange={setCheckOut}
+            slotProps={{ textField: { size: 'small' } }}
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={3}>
+          <TextField
+            type="number"
+            label="Guests"
+            value={guests}
+            onChange={(e) => setGuests(parseInt(e.target.value) || 1)}
+            size="small"
+            InputProps={{ inputProps: { min: 1 } }}
+            sx={{ width: 100 }}
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={3}>
+          <TextField
+            select
+            fullWidth
+            label="Property Type"
+            value={selectedPropertyType}
+            onChange={(e) => {
+              console.log('Selected property type:', e.target.value);
+              onPropertyTypeChange(e.target.value);
+            }}
+          >
+            {propertyTypes.map((type) => (
+              <MenuItem key={type.value} value={type.value}>
+                {type.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Grid>
+
+        <Grid item xs={12} sm={3}>
+          <IconButton 
+            onClick={handleSearch} 
+            disabled={loading || !location}
+            sx={{ ml: 2 }}
+          >
+            {loading ? <CircularProgress size={24} /> : <SearchIcon />}
+          </IconButton>
+        </Grid>
+      </Grid>
     </Paper>
   );
 };

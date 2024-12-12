@@ -43,48 +43,26 @@ const getCoordinates = async (address) => {
 
 const searchProperties = async (req, res) => {
   try {
-    console.log('Search request:', req.query);
-
-    const { lat, lon, radius = 25, guests, propertyType } = req.query;
-    
-    if (!lat || !lon) {
-      return res.status(400).json({ 
-        status: 'error',
-        message: 'Latitude and longitude are required' 
-      });
-    }
-
-    // Convert string parameters to numbers
-    const searchParams = {
-      lat: parseFloat(lat),
-      lon: parseFloat(lon),
-      radius: parseFloat(radius) * 1000, // Convert km to meters
-      guests: parseInt(guests) || 1,
-      propertyType: propertyType
-    };
-
-    console.log('Searching with params:', searchParams);
+    const { lat, lon, radius = 25, guests = 1, propertyType } = req.query;
+    console.log('Search params:', { lat, lon, radius, guests, propertyType });
 
     const properties = await findPropertiesInRadius(
-      searchParams.lat,
-      searchParams.lon,
-      searchParams.radius,
-      searchParams.guests,
-      searchParams.propertyType
+      parseFloat(lat),
+      parseFloat(lon),
+      parseFloat(radius),
+      parseInt(guests),
+      propertyType || null
     );
-
-    console.log(`Found ${properties.length} properties`);
 
     res.json({
       status: 'success',
       data: properties
     });
   } catch (error) {
-    console.error('Error searching properties:', error);
-    res.status(500).json({ 
+    console.error('Search error:', error);
+    res.status(500).json({
       status: 'error',
-      message: 'Error searching properties',
-      details: error.message 
+      message: 'Error searching properties'
     });
   }
 };

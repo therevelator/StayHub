@@ -100,7 +100,6 @@ const findPropertiesInRadius = async (lat, lon, radius, guests, propertyType) =>
             'id', r.id,
             'name', r.name,
             'room_type', r.room_type,
-            'bed_type', r.bed_type,
             'beds', r.beds,
             'max_occupancy', r.max_occupancy,
             'base_price', r.base_price,
@@ -112,22 +111,37 @@ const findPropertiesInRadius = async (lat, lon, radius, guests, propertyType) =>
         FROM rooms r
         WHERE r.property_id = p.id
       ) as rooms,
-      ST_Distance_Sphere(
-        point(p.longitude, p.latitude),
-        point(?, ?)
-      ) / 1000 as distance
+      (
+        6371 * acos(
+          cos(radians(?)) * 
+          cos(radians(p.latitude)) * 
+          cos(radians(p.longitude) - radians(?)) + 
+          sin(radians(?)) * 
+          sin(radians(p.latitude))
+        )
+      ) AS distance
     FROM properties p
+    LEFT JOIN rooms r ON p.id = r.property_id
+    WHERE 
+      r.max_occupancy >= ?
+      ${propertyType ? 'AND p.property_type = ?' : ''}
+    GROUP BY p.id
     HAVING distance <= ?
-    ORDER BY distance;
+    ORDER BY distance
   `;
 
   try {
-    console.log('Executing search query with params:', { lat, lon, radius: radius/1000, guests, propertyType });
-    const queryParams = [lon, lat, radius/1000];
+    console.log('Executing search query with params:', { lat, lon, radius, guests, propertyType });
+    
+    // Build query params array based on whether propertyType is provided
+    const queryParams = propertyType 
+      ? [lat, lon, lat, guests, propertyType, radius]
+      : [lat, lon, lat, guests, radius];
+      
     console.log('Query params:', queryParams);
     
     const [rows] = await db.query(query, queryParams);
-    console.log(`Found ${rows.length} properties within ${radius/1000}km radius`);
+    console.log(`Found ${rows.length} properties within ${radius}km radius`);
     
     return rows.map(property => {
       // Parse rooms if it's a string
@@ -137,7 +151,6 @@ const findPropertiesInRadius = async (lat, lon, radius, guests, propertyType) =>
 
       return {
         ...property,
-        distance: Math.round(property.distance * 10) / 10, // Round to 1 decimal place
         rooms: rooms || []
       };
     });

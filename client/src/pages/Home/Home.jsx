@@ -10,6 +10,7 @@ const Home = () => {
   const [searchResults, setSearchResults] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [propertyType, setPropertyType] = useState('');
 
   useEffect(() => {
     const searchWithCurrentLocation = async (position) => {
@@ -73,6 +74,53 @@ const Home = () => {
     setLoading(false);
   };
 
+  const handlePropertyTypeChange = async (type) => {
+    console.log('Property type changed to:', type);
+    setPropertyType(type);
+    setLoading(true);
+    setError(null);
+    
+    try {
+      if (searchResults?.searchParams) {
+        const { lat, lon, radius, guests, location } = searchResults.searchParams;
+        console.log('Current search params:', searchResults.searchParams);
+        
+        let latitude = lat;
+        let longitude = lon;
+
+        const response = await api.get('/properties/search', { 
+          params: {
+            lat: latitude,
+            lon: longitude,
+            radius: radius || 25,
+            guests: guests || 1,
+            propertyType: type === '' ? null : type
+          }
+        });
+
+        console.log('API Response:', response.data);
+
+        if (response.data.status === 'success') {
+          setSearchResults({
+            ...searchResults,
+            results: response.data.data,
+            searchParams: {
+              ...searchResults.searchParams,
+              propertyType: type
+            }
+          });
+        } else {
+          throw new Error(response.data.message || 'Failed to filter properties');
+        }
+      }
+    } catch (error) {
+      console.error('Error filtering properties:', error);
+      setError(error.response?.data?.message || error.message || 'Unable to filter properties. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePropertyClick = (propertyId) => {
     navigate(`/properties/${propertyId}`);
   };
@@ -88,6 +136,8 @@ const Home = () => {
         <SearchBar 
           onSearchResults={handleSearchResults}
           initialLocation={searchResults?.searchParams?.location}
+          onPropertyTypeChange={handlePropertyTypeChange}
+          selectedPropertyType={propertyType}
         />
       </Container>
 
