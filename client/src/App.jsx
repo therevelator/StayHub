@@ -11,7 +11,7 @@ import PropertyTypes from './components/PropertyTypes/PropertyTypes';
 import Destinations from './components/Destinations/Destinations';
 import RegisterForm from './components/Auth/RegisterForm';
 import SignInForm from './components/Auth/SignInForm';
-import PropertyDetails from './components/Property/PropertyDetails';
+import PropertyDetails from './pages/PropertyDetails/PropertyDetails';
 import ListProperty from './pages/ListProperty/ListProperty';
 import CreatePropertyWizard from './components/Property/CreatePropertyWizard';
 import EditProperty from './pages/EditProperty/EditProperty';

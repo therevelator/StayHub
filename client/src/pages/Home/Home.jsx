@@ -3,8 +3,10 @@ import { Container, Typography, Box, Grid, Card, CardContent, CardMedia, Circula
 import Alert from '@mui/material/Alert';
 import SearchBar from '../../components/SearchBar/SearchBar';
 import api from '../../services/api';
+import { useNavigate } from 'react-router-dom';
 
 const Home = () => {
+  const navigate = useNavigate();
   const [searchResults, setSearchResults] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -71,6 +73,10 @@ const Home = () => {
     setLoading(false);
   };
 
+  const handlePropertyClick = (propertyId) => {
+    navigate(`/properties/${propertyId}`);
+  };
+
   return (
     <Box>
       <Container maxWidth="lg" sx={{ mt: 4 }}>
@@ -120,17 +126,20 @@ const Home = () => {
 
                 return (
                   <Grid item key={property.id} xs={12} sm={6} md={4}>
-                    <Card sx={{ 
-                      height: '100%', 
-                      display: 'flex', 
-                      flexDirection: 'column',
-                      '&:hover': {
-                        transform: 'translateY(-4px)',
-                        transition: 'transform 0.2s ease-in-out',
-                        boxShadow: 3
-                      },
-                      cursor: 'pointer'
-                    }}>
+                    <Card 
+                      sx={{ 
+                        height: '100%', 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        '&:hover': {
+                          transform: 'translateY(-4px)',
+                          transition: 'transform 0.2s ease-in-out',
+                          boxShadow: 3
+                        },
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => handlePropertyClick(property.id)}
+                    >
                       <CardMedia
                         component="img"
                         height="200"
