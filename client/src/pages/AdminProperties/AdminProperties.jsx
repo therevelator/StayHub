@@ -18,7 +18,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  DialogContentText
+  DialogContentText,
+  Select,
+  MenuItem,
+  FormControl
 } from '@mui/material';
 
 const AdminProperties = () => {
@@ -72,6 +75,23 @@ const AdminProperties = () => {
     setPropertyToDelete(null);
   };
 
+  const handleStatusChange = async (propertyId, newStatus) => {
+    try {
+      await api.patch(`/properties/${propertyId}/status`, {
+        is_active: newStatus === 1
+      });
+      
+      // Update local state
+      setProperties(properties.map(property => 
+        property.id === propertyId 
+          ? { ...property, is_active: newStatus }
+          : property
+      ));
+    } catch (error) {
+      console.error('Error updating property status:', error);
+    }
+  };
+
   // Only show delete button if user is admin
   const showDeleteButton = user?.role === 'admin';
 
@@ -90,6 +110,7 @@ const AdminProperties = () => {
                 <TableCell>Location</TableCell>
                 <TableCell>Type</TableCell>
                 <TableCell>Host</TableCell>
+                <TableCell>Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -100,6 +121,25 @@ const AdminProperties = () => {
                   <TableCell>{`${property.city}, ${property.country}`}</TableCell>
                   <TableCell>{property.property_type}</TableCell>
                   <TableCell>{property.host_email}</TableCell>
+                  <TableCell>
+                    <Select
+                      size="small"
+                      value={property.is_active ? 1 : 0}
+                      onChange={(e) => handleStatusChange(property.id, e.target.value)}
+                      sx={{ minWidth: 120 }}
+                    >
+                      <MenuItem value={1}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', color: 'success.main' }}>
+                          Active
+                        </Box>
+                      </MenuItem>
+                      <MenuItem value={0}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary' }}>
+                          Inactive
+                        </Box>
+                      </MenuItem>
+                    </Select>
+                  </TableCell>
                   <TableCell align="right">
                     <Button
                       variant="outlined"

@@ -148,22 +148,67 @@ const createNewProperty = async (req, res) => {
 const updatePropertyById = async (req, res) => {
   try {
     const { id } = req.params;
-    const hostId = req.user.id;
     
-    // Verify ownership
+    // Add debug logging
+    console.log('Update property request:', {
+      userId: req.user?.userId,
+      userRole: req.user?.role,
+      propertyId: id
+    });
+    
+    // First check if property exists and get owner info
     const property = await getPropertyById(id);
     if (!property) {
-      return res.status(404).json({ message: 'Property not found' });
-    }
-    
-    if (property.host_id !== hostId && !req.user.isAdmin) {
-      return res.status(403).json({ message: 'Not authorized to update this property' });
+      return res.status(404).json({
+        status: 'error',
+        message: 'Property not found'
+      });
     }
 
-    const updatedProperty = await updateProperty(id, req.body);
+    console.log('Property details:', {
+      hostId: property.host_id,
+      requestUserId: req.user?.userId,
+      userRole: req.user?.role
+    });
+
+    // Check if this is a status update or full property update
+    if (req.body.hasOwnProperty('is_active')) {
+      // Status update - allow both admin and owner
+      if (req.user.role !== 'admin' && req.user.userId !== property.host_id) {
+        return res.status(403).json({ 
+          status: 'error',
+          message: 'Only administrators and property owners can update property status' 
+        });
+      }
+
+      await db.query(
+        'UPDATE properties SET is_active = ? WHERE id = ?',
+        [req.body.is_active, id]
+      );
+    } else {
+      // Full property update - allow both admin and owner
+      if (req.user.role !== 'admin' && req.user.userId !== property.host_id) {
+        console.log('Authorization failed:', {
+          userRole: req.user.role,
+          userId: req.user.userId,
+          hostId: property.host_id
+        });
+        return res.status(403).json({ 
+          status: 'error',
+          message: 'Only administrators and property owners can update this property' 
+        });
+      }
+
+      const updatedProperty = await updateProperty(id, req.body);
+      return res.json({
+        status: 'success',
+        data: updatedProperty
+      });
+    }
+
     res.json({
       status: 'success',
-      data: updatedProperty
+      message: 'Property updated successfully'
     });
   } catch (error) {
     console.error('Error updating property:', error);
@@ -246,14 +291,20 @@ export const getAllProperties = async (req, res) => {
         ) as rooms
       FROM properties p
       LEFT JOIN users u ON p.host_id COLLATE utf8mb4_unicode_ci = u.id COLLATE utf8mb4_unicode_ci
+      WHERE 1=1
     `;
 
     let queryParams = [];
 
     // Add user filtering only if user exists and is NOT admin
     if (req.user && req.user.role !== 'admin') {
-      query += ' WHERE p.host_id COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci';
+      query += ' AND p.host_id COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci';
       queryParams.push(req.user.userId);
+    } else {
+      // For public view or admin view, only show active properties
+      if (!req.user || req.user.role !== 'admin') {
+        query += ' AND p.is_active = 1';
+      }
     }
 
     // Add ordering
@@ -285,7 +336,8 @@ export const getAllProperties = async (req, res) => {
       return {
         ...property,
         rooms: rooms || [],
-        price: lowestPrice // Use lowest room price as property price
+        price: lowestPrice, // Use lowest room price as property price
+        is_active: property.is_active === 1 // Ensure boolean value
       };
     });
 
@@ -300,6 +352,49 @@ export const getAllProperties = async (req, res) => {
       status: 'error',
       message: 'Error fetching properties',
       details: error.message
+    });
+  }
+};
+
+export const updatePropertyStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { is_active } = req.body;
+    
+    console.log('Updating property status:', { id, is_active });
+
+    // First check if property exists and get owner info
+    const property = await getPropertyById(id);
+    if (!property) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Property not found'
+      });
+    }
+
+    // Update the property status
+    const [result] = await db.query(
+      'UPDATE properties SET is_active = ? WHERE id = ?',
+      [is_active ? 1 : 0, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Property not found'
+      });
+    }
+
+    res.json({
+      status: 'success',
+      message: 'Property status updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating property status:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error updating property status',
+      error: error.message
     });
   }
 };

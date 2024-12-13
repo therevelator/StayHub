@@ -79,17 +79,52 @@ class User {
     }
   }
 
-  static async createProfile(userId, profileData) {
+  static async createProfile(userId) {
     try {
-      const [result] = await db.query(
-        `INSERT INTO user_profiles (user_id, language, currency, notifications)
-         VALUES (?, ?, ?, ?)`,
-        [userId, profileData.language, profileData.currency, JSON.stringify(profileData.notifications)]
+      console.log('Creating profile for user:', userId);
+
+      // First check if profile already exists
+      const [existingProfile] = await db.query(
+        'SELECT * FROM user_profiles WHERE user_id = ?',
+        [userId]
       );
-      return result;
+
+      if (existingProfile.length > 0) {
+        console.log('Profile already exists for user:', userId);
+        return existingProfile[0];
+      }
+
+      const defaultProfile = {
+        user_id: userId,
+        notifications: JSON.stringify({ email: true, push: false })
+      };
+
+      const query = `
+        INSERT INTO user_profiles (user_id, notifications)
+        VALUES (?, ?)
+      `;
+
+      console.log('Executing query:', query);
+      console.log('Query params:', [defaultProfile.user_id, defaultProfile.notifications]);
+
+      const [result] = await db.query(query, [
+        defaultProfile.user_id,
+        defaultProfile.notifications
+      ]);
+
+      console.log('Insert result:', result);
+
+      if (!result.affectedRows) {
+        throw new Error('No rows were inserted');
+      }
+
+      return defaultProfile;
     } catch (error) {
-      console.error('Error in User.createProfile:', error);
-      throw new Error('Failed to create user profile');
+      console.error('Error in createProfile:', error);
+      if (error.code === 'ER_DUP_ENTRY') {
+        throw new Error('Profile already exists for this user');
+      }
+      throw new Error(`Failed to create user profile: ${error.message}`);
     }
   }
 

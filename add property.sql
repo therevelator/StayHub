@@ -36,7 +36,7 @@ INSERT INTO properties (
   2,
   3,
   2,
-  'hotel',
+  'apartment',
   '14:00:00',
   '12:00:00',
   'flexible',

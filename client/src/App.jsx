@@ -133,6 +133,7 @@ function App() {
               <Route path="/admin/properties" element={<AdminProperties />} />
               <Route path="/admin/properties/:id/edit" element={<AdminEditProperty />} />
               <Route path="/search" element={<SearchResults />} />
+              <Route path="/property/:id" element={<PropertyDetails />} />
             </Routes>
           </Router>
         </AuthProvider>

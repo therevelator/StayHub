@@ -5,7 +5,8 @@ import {
   createNewProperty, 
   updatePropertyById, 
   deletePropertyById,
-  getAllProperties 
+  getAllProperties,
+  updatePropertyStatus
 } from '../controllers/property.controller.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 
@@ -21,5 +22,6 @@ router.get('/', getAllProperties);  // Add authentication here
 router.post('/', createNewProperty);
 router.put('/:id', updatePropertyById);
 router.delete('/:id', deletePropertyById);
+router.patch('/:id/status', updatePropertyStatus);
 
 export default router;
