@@ -11,13 +11,18 @@ import {
   Typography,
   Paper,
   Container,
+  TextField,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 import BasicInfoForm from './steps/BasicInfoForm';
 import LocationForm from './steps/LocationForm';
 import AmenitiesForm from './steps/AmenitiesForm';
-import RoomForm from './steps/RoomForm';
+import RoomForm from '../../components/Room/RoomForm';
 import PhotosForm from './steps/PhotosForm';
 import RulesForm from './steps/RulesForm';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import SearchIcon from '@mui/icons-material/Search';
 
 const steps = [
   'Basic Information',
@@ -67,6 +72,10 @@ const ListProperty = () => {
       houseRules: []
     }
   });
+  const [address, setAddress] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchResult, setSearchResult] = useState(null);
+  const [error, setError] = useState(null);
 
   const handleNext = () => {
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
@@ -83,17 +92,7 @@ const ListProperty = () => {
       }
 
       const totalGuests = formData.rooms.reduce((sum, room) => {
-        return sum + room.beds.reduce((bedSum, bed) => {
-          const occupancy = {
-            'Single Bed': 1,
-            'Double Bed': 2,
-            'Queen Bed': 2,
-            'King Bed': 2,
-            'Sofa Bed': 1,
-            'Bunk Bed': 2
-          };
-          return bedSum + (occupancy[bed.type] || 0) * (bed.count || 1);
-        }, 0);
+        return sum + (room.maxGuests || 0);
       }, 0);
 
       const propertyData = {
@@ -147,27 +146,9 @@ const ListProperty = () => {
             data={formData.rooms}
             onChange={(data) => {
               const totalGuests = data.reduce((sum, room) => {
-                return sum + room.beds.reduce((bedSum, bed) => {
-                  const occupancy = {
-                    'Single Bed': 1,
-                    'Double Bed': 2,
-                    'Queen Bed': 2,
-                    'King Bed': 2,
-                    'Sofa Bed': 1,
-                    'Bunk Bed': 2
-                  };
-                  return bedSum + (occupancy[bed.type] || 0) * (bed.count || 1);
-                }, 0);
+                return sum + (room.maxGuests || 0);
               }, 0);
-              
-              setFormData(prev => ({
-                ...prev,
-                rooms: data,
-                basicInfo: {
-                  ...prev.basicInfo,
-                  guests: totalGuests.toString()
-                }
-              }));
+              setFormData({ ...formData, rooms: data, totalGuests });
             }}
           />
         );
@@ -187,6 +168,52 @@ const ListProperty = () => {
         );
       default:
         return 'Unknown step';
+    }
+  };
+
+  const handleAddressSearch = async () => {
+    if (!address.trim()) {
+      setError('Please enter an address');
+      return;
+    }
+
+    setSearching(true);
+    setError(null);
+    setSearchResult(null);
+
+    try {
+      const geocodingUrl = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(address)}&key=${import.meta.env.VITE_OPENCAGE_API_KEY}`;
+      const response = await fetch(geocodingUrl);
+      const data = await response.json();
+
+      if (data.results && data.results.length > 0) {
+        const result = data.results[0];
+        setSearchResult({
+          formatted: result.formatted,
+          coordinates: {
+            lat: result.geometry.lat,
+            lng: result.geometry.lng
+          }
+        });
+      } else {
+        setError('Address not found. Please try a different address.');
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      setError('Failed to verify address. Please try again.');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleContinue = () => {
+    if (searchResult) {
+      navigate('/add-property', { 
+        state: { 
+          address: searchResult.formatted,
+          coordinates: searchResult.coordinates 
+        } 
+      });
     }
   };
 

@@ -1,25 +1,12 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 import Header from './components/Header/Header';
-import SearchBar from './components/SearchBar/SearchBar';
-import PropertyTypes from './components/PropertyTypes/PropertyTypes';
-import Destinations from './components/Destinations/Destinations';
-import RegisterForm from './components/Auth/RegisterForm';
-import SignInForm from './components/Auth/SignInForm';
-import PropertyDetails from './pages/PropertyDetails/PropertyDetails';
-import ListProperty from './pages/ListProperty/ListProperty';
-import CreatePropertyWizard from './components/Property/CreatePropertyWizard';
-import EditProperty from './pages/EditProperty/EditProperty';
 import { AuthProvider } from './context/AuthContext';
-import AdminEditProperty from './pages/AdminEditProperty/AdminEditProperty';
-import AdminProperties from './pages/AdminProperties/AdminProperties';
-import SearchResults from './pages/SearchResults/SearchResults';
-import Home from './pages/Home/Home';
 
 // Theme configuration
 const theme = createTheme({
@@ -117,25 +104,8 @@ function App() {
       <LocalizationProvider dateAdapter={AdapterDateFns}>
         <CssBaseline />
         <AuthProvider>
-          <Router>
-            <Header />
-            <Routes>
-              <Route
-                path="/"
-                element={<Home />}
-              />
-              <Route path="/register" element={<RegisterForm />} />
-              <Route path="/signin" element={<SignInForm />} />
-              <Route path="/list-property" element={<ListProperty />} />
-              <Route path="/create-property-wizard" element={<CreatePropertyWizard />} />
-              <Route path="/properties/:id" element={<PropertyDetails />} />
-              <Route path="/properties/:id/edit" element={<EditProperty />} />
-              <Route path="/admin/properties" element={<AdminProperties />} />
-              <Route path="/admin/properties/:id/edit" element={<AdminEditProperty />} />
-              <Route path="/search" element={<SearchResults />} />
-              <Route path="/property/:id" element={<PropertyDetails />} />
-            </Routes>
-          </Router>
+          <Header />
+          <Outlet />
         </AuthProvider>
       </LocalizationProvider>
     </ThemeProvider>

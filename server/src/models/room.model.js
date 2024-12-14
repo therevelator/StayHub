@@ -5,100 +5,99 @@ const VALID_ROOM_TYPES = [
   'single room',
   'double room',
   'triple room',
-  'quad room',
-  'suite',
-  'deluxe room',
+  'quadruple room',
+  'multi room',
+  'apartment',
+  'penthouse',
+  'studio apartment',
+  'deluxe suite',
   'executive suite',
-  'presidential suite',
   'family room',
-  'connecting room',
+  'connecting rooms',
   'accessible room',
-  'penthouse suite',
-  'studio room',
-  'ocean view room',
-  'garden view room',
-  'honeymoon suite',
-  'junior suite',
-  'standard room'
+  'presidential suite',
+  'other'
 ];
 
 // Add descriptions for each room type
 const ROOM_TYPE_DESCRIPTIONS = {
-  'single room': 'Cozy room with a single bed, perfect for solo travelers',
-  'double room': 'Comfortable room with a double bed or two single beds',
-  'triple room': 'Spacious room that can accommodate up to three guests',
-  'quad room': 'Large room suitable for four guests',
-  'suite': 'Elegant suite with separate living area',
-  'deluxe room': 'Premium room with enhanced amenities and comfort',
-  'executive suite': 'Upscale suite with premium furnishings and business amenities',
-  'presidential suite': 'Our most luxurious suite with exceptional amenities',
-  'family room': 'Spacious room designed for families with children',
-  'connecting room': 'Two adjacent rooms with a connecting door',
-  'accessible room': 'Specially designed room with accessibility features',
-  'penthouse suite': 'Luxury suite located on the top floor with panoramic views',
-  'studio room': 'Open-plan room with living and sleeping areas combined',
-  'ocean view room': 'Room with beautiful views of the ocean',
-  'garden view room': 'Room overlooking our landscaped gardens',
-  'honeymoon suite': 'Romantic suite perfect for newlyweds',
-  'junior suite': 'Compact suite with a small sitting area',
-  'standard room': 'Comfortable room with all essential amenities'
+  'single room': 'Cozy room designed for one person',
+  'double room': 'Comfortable room suitable for two people',
+  'triple room': 'Spacious room that accommodates three people',
+  'quadruple room': 'Large room designed for four people',
+  'multi room': 'Flexible space that can accommodate multiple guests',
+  'apartment': 'Full apartment with kitchen and living spaces',
+  'penthouse': 'Luxury top-floor accommodation with premium amenities',
+  'studio apartment': 'Compact apartment with combined living and sleeping area',
+  'deluxe suite': 'Premium suite with enhanced comfort and amenities',
+  'executive suite': 'Upscale suite with separate living area and premium features',
+  'family room': 'Spacious room designed for families',
+  'connecting rooms': 'Adjacent rooms with connecting door',
+  'accessible room': 'Room designed for accessibility needs',
+  'presidential suite': 'Most luxurious suite with exceptional amenities',
+  'other': 'Custom room type'
 };
 
 export const createRoom = async (propertyId, roomData) => {
-  // Normalize the room type to match exactly with our ENUM values
-  const normalizedType = roomData.type?.toLowerCase() || 'standard room';
-  
-  console.log('Original room type:', roomData.type);
-  console.log('Normalized room type:', normalizedType);
-
-  if (!VALID_ROOM_TYPES.includes(normalizedType)) {
-    throw new Error(`Invalid room type. Must be one of: ${VALID_ROOM_TYPES.join(', ')}`);
-  }
-
-  // Add default description if none provided
-  const description = roomData.description || ROOM_TYPE_DESCRIPTIONS[normalizedType];
-
-  const query = `
-    INSERT INTO rooms (
-      property_id, 
-      name, 
-      room_type, 
-      beds,
-      max_occupancy, 
-      base_price, 
-      cleaning_fee,
-      service_fee,
-      tax_rate,
-      security_deposit,
-      description
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-  
-  const values = [
-    propertyId,
-    roomData.name,
-    normalizedType,
-    JSON.stringify(roomData.beds || []),
-    roomData.maxOccupancy || 2,
-    roomData.basePrice || 0,
-    roomData.cleaningFee || 0,
-    roomData.serviceFee || 0,
-    roomData.taxRate || 0,
-    roomData.securityDeposit || null,
-    description
-  ];
+  const connection = await db.getConnection();
   
   try {
-    const [result] = await db.query(query, values);
-    return { 
-      id: result.insertId, 
-      ...roomData,
-      room_type: normalizedType,
-      description
+    await connection.beginTransaction();
+
+    // Ensure all JSON fields are properly stringified
+    const roomDataWithStringifiedJson = {
+      property_id: propertyId,
+      name: roomData.name,
+      room_type: roomData.room_type,
+      beds: JSON.stringify(roomData.beds),
+      room_size: roomData.room_size,
+      max_occupancy: roomData.max_occupancy,
+      view_type: roomData.view_type,
+      has_private_bathroom: roomData.has_private_bathroom,
+      amenities: JSON.stringify(roomData.amenities),
+      smoking: roomData.smoking,
+      accessibility_features: JSON.stringify(roomData.accessibility_features),
+      floor_level: roomData.floor_level,
+      has_balcony: roomData.has_balcony,
+      has_kitchen: roomData.has_kitchen,
+      has_minibar: roomData.has_minibar,
+      climate: JSON.stringify(roomData.climate),
+      price_per_night: roomData.price_per_night,
+      cancellation_policy: roomData.cancellation_policy,
+      includes_breakfast: roomData.includes_breakfast,
+      extra_bed_available: roomData.extra_bed_available,
+      pets_allowed: roomData.pets_allowed,
+      images: JSON.stringify(roomData.images),
+      cleaning_frequency: roomData.cleaning_frequency,
+      description: roomData.description,
+      has_toiletries: roomData.has_toiletries,
+      has_towels_linens: roomData.has_towels_linens,
+      has_room_service: roomData.has_room_service,
+      flooring_type: roomData.flooring_type,
+      energy_saving_features: JSON.stringify(roomData.energy_saving_features),
+      status: roomData.status || 'available'
     };
+
+    console.log('Room data before insert:', roomDataWithStringifiedJson);
+    console.log('JSON fields:');
+    console.log('beds:', typeof roomDataWithStringifiedJson.beds);
+    console.log('amenities:', typeof roomDataWithStringifiedJson.amenities);
+    console.log('climate:', typeof roomDataWithStringifiedJson.climate);
+
+    const [result] = await connection.query(
+      'INSERT INTO rooms SET ?',
+      [roomDataWithStringifiedJson]
+    );
+
+    await connection.commit();
+    return { id: result.insertId, ...roomData };
+
   } catch (error) {
     console.error('Error creating room:', error);
+    await connection.rollback();
     throw error;
+  } finally {
+    connection.release();
   }
 };
 
@@ -119,25 +118,61 @@ export const getRoomsByPropertyId = async (propertyId) => {
 };
 
 export const updateRoom = async (roomId, roomData) => {
-  const { name, type, bedType, maxOccupancy, basePrice, description } = roomData;
-  
-  const query = `
-    UPDATE rooms 
-    SET name = ?, room_type = ?, bed_type = ?, max_occupancy = ?, base_price = ?, description = ?
-    WHERE id = ?
-  `;
-  
-  const values = [name, type, bedType, maxOccupancy, basePrice, description, roomId];
+  const connection = await db.getConnection();
   
   try {
-    const [result] = await db.query(query, values);
-    if (result.affectedRows === 0) {
-      throw new Error('Room not found');
+    await connection.beginTransaction();
+
+    // Update room
+    await connection.query(`
+      UPDATE rooms 
+      SET 
+        name = ?,
+        room_type = ?,
+        beds = ?,
+        max_occupancy = ?,
+        base_price = ?,
+        cleaning_fee = ?,
+        service_fee = ?,
+        tax_rate = ?,
+        security_deposit = ?,
+        description = ?,
+        bathroom_type = ?
+      WHERE id = ?
+    `, [
+      roomData.name,
+      roomData.type,
+      JSON.stringify(roomData.beds || []),
+      roomData.maxOccupancy || 2,
+      roomData.basePrice || 0,
+      roomData.cleaningFee || 0,
+      roomData.serviceFee || 0,
+      roomData.taxRate || 0,
+      roomData.securityDeposit || null,
+      roomData.description || '',
+      roomData.bathroom_type || 'private',
+      roomId
+    ]);
+
+    // Update amenities
+    await connection.query('DELETE FROM room_amenities WHERE room_id = ?', [roomId]);
+    
+    if (roomData.amenities?.length) {
+      const amenityValues = roomData.amenities.map(amenity => [roomId, amenity]);
+      await connection.query(
+        'INSERT INTO room_amenities (room_id, amenity) VALUES ?',
+        [amenityValues]
+      );
     }
+
+    await connection.commit();
     return { id: roomId, ...roomData };
+
   } catch (error) {
-    console.error('Error updating room:', error);
+    await connection.rollback();
     throw error;
+  } finally {
+    connection.release();
   }
 };
 

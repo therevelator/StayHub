@@ -100,6 +100,7 @@ const createPropertiesTable = async () => {
       tax_rate DECIMAL(5, 2),
       security_deposit DECIMAL(10, 2),
       description TEXT,
+      bathroom_type VARCHAR(50),
       FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE
     )`
   ];
@@ -473,29 +474,48 @@ const createProperty = async (propertyData) => {
         parseFloat(room.serviceFee) || null,
         parseFloat(room.taxRate) || null,
         parseFloat(room.securityDeposit) || null,
-        room.description
+        room.description,
+        room.bathroom_type || 'private'
       ]);
 
       await connection.query(
         `INSERT INTO rooms 
-        (property_id, name, room_type, beds, max_occupancy, base_price, cleaning_fee, service_fee, tax_rate, security_deposit, description) 
+        (property_id, name, room_type, beds, max_occupancy, base_price, cleaning_fee, service_fee, tax_rate, security_deposit, description, bathroom_type) 
         VALUES ?`,
         [roomValues]
       );
     }
 
-    // Insert amenities
-    const amenityValues = [];
-    Object.entries(propertyData.amenities).forEach(([category, amenityList]) => {
-      amenityList.forEach(amenity => {
-        amenityValues.push([propertyId, amenity, category]);
+    // Handle amenities with duplicate prevention
+    if (propertyData.amenities) {
+      const processedAmenities = new Set();
+      const amenityValues = [];
+
+      Object.entries(propertyData.amenities).forEach(([category, amenities]) => {
+        // Remove duplicates within each category
+        const uniqueAmenities = [...new Set(amenities)];
+        
+        uniqueAmenities.forEach(amenity => {
+          const amenityKey = `${propertyId}-${category}-${amenity}`;
+          
+          if (!processedAmenities.has(amenityKey)) {
+            processedAmenities.add(amenityKey);
+            amenityValues.push([
+              propertyId,
+              amenity,
+              category
+            ]);
+          }
+        });
       });
-    });
-    if (amenityValues.length > 0) {
-      await connection.query(
-        'INSERT INTO property_amenities (property_id, amenity, category) VALUES ?',
-        [amenityValues]
-      );
+
+      if (amenityValues.length > 0) {
+        await connection.query(
+          `INSERT INTO property_amenities (property_id, amenity, category) 
+           VALUES ?`,
+          [amenityValues]
+        );
+      }
     }
 
     // Insert house rules
@@ -538,73 +558,159 @@ const createProperty = async (propertyData) => {
 };
 
 // Update a property
-const updateProperty = async (id, propertyData) => {
-  console.log('Updating property:', { id, propertyData });
+const updateProperty = async (propertyId, propertyData) => {
+  const connection = await db.getConnection();
   
-  const {
-    basicInfo,
-    location,
-    rules,
-    amenities
-  } = propertyData;
-
   try {
-    const query = `
+    await connection.beginTransaction();
+
+    // Format time values
+    const formatTime = (timeString) => {
+      if (!timeString) return null;
+      try {
+        const date = new Date(timeString);
+        return date.toTimeString().split(' ')[0];
+      } catch (error) {
+        console.error('Error formatting time:', error);
+        return null;
+      }
+    };
+
+    const checkInTime = formatTime(propertyData.rules.checkInTime);
+    const checkOutTime = formatTime(propertyData.rules.checkOutTime);
+
+    console.log('Formatted check-in time:', checkInTime);
+    console.log('Formatted check-out time:', checkOutTime);
+
+    // Update basic property information
+    const updateQuery = `
       UPDATE properties 
       SET 
         name = ?,
         description = ?,
-        latitude = ?,
-        longitude = ?,
+        property_type = ?,
+        guests = ?,
+        bedrooms = ?,
+        beds = ?,
+        bathrooms = ?,
         street = ?,
         city = ?,
         state = ?,
         country = ?,
         postal_code = ?,
-        guests = ?,
-        bedrooms = ?,
-        beds = ?,
-        bathrooms = ?,
-        property_type = ?,
+        latitude = ?,
+        longitude = ?,
         check_in_time = ?,
         check_out_time = ?,
         cancellation_policy = ?,
         pet_policy = ?,
         event_policy = ?,
-        is_active = ?,
-        updated_at = CURRENT_TIMESTAMP
+        updated_at = NOW()
       WHERE id = ?
     `;
 
-    const [result] = await db.query(query, [
-      basicInfo.name,
-      basicInfo.description,
-      location.coordinates.lat,
-      location.coordinates.lng,
-      location.street,
-      location.city,
-      location.state,
-      location.country,
-      location.postalCode,
-      parseInt(basicInfo.guests) || 4,
-      parseInt(basicInfo.bedrooms) || 1,
-      parseInt(basicInfo.beds) || 1,
-      parseInt(basicInfo.bathrooms) || 1,
-      basicInfo.propertyType,
-      formatTime(rules.checkInTime),
-      formatTime(rules.checkOutTime),
-      rules.cancellationPolicy,
-      rules.petPolicy,
-      rules.eventPolicy,
-      rules.isActive ? 1 : 0, // Convert boolean to 1/0
-      id
+    await connection.query(updateQuery, [
+      propertyData.basicInfo.name,
+      propertyData.basicInfo.description,
+      propertyData.basicInfo.propertyType,
+      propertyData.basicInfo.guests,
+      propertyData.basicInfo.bedrooms,
+      propertyData.basicInfo.beds,
+      propertyData.basicInfo.bathrooms,
+      propertyData.location.street,
+      propertyData.location.city,
+      propertyData.location.state,
+      propertyData.location.country,
+      propertyData.location.postalCode,
+      propertyData.location.coordinates.lat,
+      propertyData.location.coordinates.lng,
+      checkInTime,
+      checkOutTime,
+      propertyData.rules.cancellationPolicy,
+      propertyData.rules.petPolicy,
+      propertyData.rules.eventPolicy,
+      propertyId
     ]);
 
-    console.log('Update result:', result);
-    return result;
+    // Handle amenities with duplicate prevention and error reporting
+    if (propertyData.amenities) {
+      const duplicates = [];
+      const processedAmenities = new Set();
+      const amenityValues = [];
+
+      Object.entries(propertyData.amenities).forEach(([category, amenities]) => {
+        // Remove duplicates within each category
+        amenities.forEach(amenity => {
+          const amenityKey = `${propertyId}-${category}-${amenity}`;
+          
+          if (processedAmenities.has(amenityKey)) {
+            duplicates.push({ category, amenity });
+          } else {
+            processedAmenities.add(amenityKey);
+            amenityValues.push([propertyId, amenity, category]);
+          }
+        });
+      });
+
+      if (duplicates.length > 0) {
+        const duplicateMessages = duplicates.map(d => 
+          `"${d.amenity}" is already added in ${d.category}`
+        );
+        throw new Error(`Duplicate amenities found: ${duplicateMessages.join(', ')}`);
+      }
+
+      // Delete existing amenities
+      await connection.query(
+        'DELETE FROM property_amenities WHERE property_id = ?',
+        [propertyId]
+      );
+
+      // Insert unique amenities
+      if (amenityValues.length > 0) {
+        await connection.query(
+          `INSERT INTO property_amenities (property_id, amenity, category) 
+           VALUES ?`,
+          [amenityValues]
+        );
+      }
+    }
+
+    // Handle rooms update if needed
+    if (propertyData.rooms) {
+      // Your existing room update logic
+    }
+
+    // Handle photos update if needed
+    if (propertyData.photos) {
+      // Your existing photo update logic
+    }
+
+    await connection.commit();
+    
+    // Return updated data with deduplicated amenities
+    const updatedAmenities = {};
+    Object.entries(propertyData.amenities).forEach(([category, amenities]) => {
+      updatedAmenities[category] = [...new Set(amenities)];
+    });
+
+    return {
+      id: propertyId,
+      ...propertyData,
+      amenities: updatedAmenities,
+      rules: {
+        ...propertyData.rules,
+        checkInTime,
+        checkOutTime
+      },
+      updated_at: new Date()
+    };
+
   } catch (error) {
-    console.error('Error updating property:', error);
+    console.error('Error in updateProperty:', error);
+    await connection.rollback();
     throw error;
+  } finally {
+    connection.release();
   }
 };
 

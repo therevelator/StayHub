@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import AddIcon from '@mui/icons-material/Add';
 import {
   Box,
   Stepper,
@@ -20,7 +21,7 @@ import LocationForm from '../ListProperty/steps/LocationForm';
 import AmenitiesForm from '../ListProperty/steps/AmenitiesForm';
 import PhotosForm from '../ListProperty/steps/PhotosForm';
 import RulesForm from '../ListProperty/steps/RulesForm';
-import RoomForm from '../ListProperty/steps/RoomForm';
+import RoomForm from '../../components/Room/RoomForm';
 
 const steps = [
   'Basic Information',
@@ -115,22 +116,104 @@ const AdminEditProperty = () => {
         );
       case 3:
         return (
-          <RoomForm
-            data={formData.rooms}
-            onChange={(data) => {
-              // Calculate total max guests from rooms
-              const totalGuests = data.reduce((sum, room) => sum + (room.maxOccupancy || 0), 0);
-              
-              setFormData(prev => ({
-                ...prev,
-                rooms: data,
-                basicInfo: {
-                  ...prev.basicInfo,
-                  guests: totalGuests.toString()
-                }
-              }));
-            }}
-          />
+          <Box>
+            {formData.rooms?.map((room, index) => (
+              <Box key={room.id || index} sx={{ mb: 4 }}>
+                <RoomForm
+                  room={{
+                    ...room,
+                    type: room.type || room.room_type,
+                    beds: room.beds ? (Array.isArray(room.beds) ? room.beds : JSON.parse(room.beds)) : []
+                  }}
+                  isEditing={true}
+                  onSubmit={async (updatedRoom) => {
+                    try {
+                      console.log('Sending room update:', updatedRoom);
+                      let response;
+                      
+                      const roomData = {
+                        ...updatedRoom,
+                        type: updatedRoom.type,
+                        beds: updatedRoom.beds
+                      };
+                      
+                      if (room.id) {
+                        // Update existing room
+                        response = await api.put(`/rooms/${room.id}`, roomData);
+                      } else {
+                        // Create new room
+                        response = await api.post(`/rooms/${id}`, roomData);
+                      }
+                      
+                      if (response.data.status === 'success') {
+                        // Parse the response data to ensure beds are in the correct format
+                        const updatedRoomData = {
+                          ...response.data.data,
+                          beds: response.data.data.beds ? 
+                            (Array.isArray(response.data.data.beds) ? 
+                              response.data.data.beds : 
+                              JSON.parse(response.data.data.beds)
+                            ) : []
+                        };
+                        const updatedRooms = [...formData.rooms];
+                        updatedRooms[index] = updatedRoomData;
+                        setFormData(prev => ({
+                          ...prev,
+                          rooms: updatedRooms
+                        }));
+                        alert(room.id ? 'Room updated successfully' : 'Room created successfully');
+                      }
+                    } catch (error) {
+                      console.error('Error saving room:', error);
+                      alert(error.response?.data?.message || 'Failed to save room');
+                    }
+                  }}
+                  onDelete={room.id ? async () => {
+                    if (window.confirm('Are you sure you want to delete this room?')) {
+                      try {
+                        const response = await api.delete(`/rooms/${room.id}`);
+                        if (response.data.status === 'success') {
+                          const updatedRooms = formData.rooms.filter((_, i) => i !== index);
+                          setFormData(prev => ({
+                            ...prev,
+                            rooms: updatedRooms
+                          }));
+                          alert('Room deleted successfully');
+                        }
+                      } catch (error) {
+                        console.error('Error deleting room:', error);
+                        alert(error.response?.data?.message || 'Failed to delete room');
+                      }
+                    }
+                  } : undefined}
+                />
+              </Box>
+            ))}
+            <Button
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setFormData(prev => ({
+                  ...prev,
+                  rooms: [...(prev.rooms || []), {
+                    name: '',
+                    type: 'Standard Room',
+                    beds: [],
+                    max_occupancy: 1,
+                    base_price: '',
+                    cleaning_fee: '',
+                    service_fee: '',
+                    tax_rate: '',
+                    security_deposit: '',
+                    description: '',
+                    bathroom_type: 'private'
+                  }]
+                }));
+              }}
+            >
+              Add New Room
+            </Button>
+          </Box>
         );
       case 4:
         return (
@@ -212,4 +295,4 @@ const AdminEditProperty = () => {
   );
 };
 
-export default AdminEditProperty; 
+export default AdminEditProperty;

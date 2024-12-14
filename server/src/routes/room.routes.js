@@ -1,36 +1,36 @@
 import express from 'express';
 import * as roomController from '../controllers/room.controller.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken } from '../middleware/auth.middleware.js';
 import checkPropertyOwnership from '../middleware/checkPropertyOwnership.js';
 
 const router = express.Router();
 
 // Create a new room for a property
-router.post('/properties/:propertyId/rooms', 
+router.post('/:propertyId', 
   authenticateToken,
   checkPropertyOwnership,
   roomController.createRoom
 );
 
 // Get all rooms for a property
-router.get('/properties/:propertyId/rooms',
+router.get('/property/:propertyId',
   roomController.getRooms
 );
 
 // Get a specific room
-router.get('/rooms/:roomId',
+router.get('/:roomId',
   roomController.getRoom
 );
 
 // Update a room
-router.put('/rooms/:roomId',
+router.put('/:roomId',
   authenticateToken,
   checkPropertyOwnership,
   roomController.updateRoom
 );
 
 // Delete a room
-router.delete('/rooms/:roomId',
+router.delete('/:roomId',
   authenticateToken,
   checkPropertyOwnership,
   roomController.deleteRoom
